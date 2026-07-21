@@ -5,12 +5,18 @@ import (
 	"net/http"
 
 	"github.com/JhayceeCodes/rate-limiter-gateway/internal/handler"
+	"github.com/JhayceeCodes/rate-limiter-gateway/internal/router"
+	"github.com/JhayceeCodes/rate-limiter-gateway/internal/store"
 )
 
 func main() {
 
 	http.HandleFunc("/health", handler.Health)
-	http.HandleFunc("/apikeys", handler.NewAPIKeyHandler().Create)
+
+	apiKeyStore := store.NewAPIKeyStore()
+	apiKeyHandler := handler.NewAPIKeyHandler(apiKeyStore)
+
+	router.RegisterRoutes(apiKeyHandler)
 
 	fmt.Println("Server running on 8080.")
 

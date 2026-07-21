@@ -2,7 +2,7 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/JhayceeCodes/rate-limiter-gateway/internal/service"
@@ -10,34 +10,41 @@ import (
 )
 
 type APIKeyHandler struct {
-	store map[string]store.APIKeyStore
+	store *store.APIKeyStore
 }
 
-func NewAPIKeyHandler() *APIKeyHandler {
+func NewAPIKeyHandler(apiKeyStore *store.APIKeyStore) *APIKeyHandler {
 	return &APIKeyHandler{
-		store: make(map[string]store.APIKeyStore),
+		store: apiKeyStore,
 	}
 }
 
 func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
-	apiKey, err := service.NewAPIKey("free")
-	if err != nil {
-		fmt.Printf("Error creating API key: %v\n", err)
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
-	newStore := store.NewAPIKeyStore()
+	apiKey, err := service.NewAPIKey("free")
+	if err != nil {
+		http.Error(w, "error creating new api key", http.StatusInternalServerError)
+		return
+	}
 
-	newStore.Create(apiKey)
+	h.store.Create(apiKey)
 
-	response := map[string]string{
-		"message": "API key created successfully",
-		"data":    apiKey.Key,
-		"status":  "ok",
+	response := APIKeyResponse{
+		Status:  "ok",
+		Message: "API key created successfully",
+		Data:    apiKey.Key,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("failed to encode response: %v", err)
+	}
 
 }
 
