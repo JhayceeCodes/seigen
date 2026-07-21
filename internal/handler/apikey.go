@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/JhayceeCodes/rate-limiter-gateway/service"
-	"github.com/JhayceeCodes/rate-limiter-gateway/store"
+	"github.com/JhayceeCodes/rate-limiter-gateway/internal/service"
+	"github.com/JhayceeCodes/rate-limiter-gateway/internal/store"
 )
 
 type APIKeyHandler struct {
@@ -31,7 +31,7 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	response := map[string]string{
 		"message": "API key created successfully",
-		"data": apiKey.Key,
+		"data":    apiKey.Key,
 		"status":  "ok",
 	}
 
