@@ -1,20 +1,54 @@
 package handler
 
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
 
+	"github.com/JhayceeCodes/rate-limiter-gateway/service"
+	"github.com/JhayceeCodes/rate-limiter-gateway/store"
+)
 
+type APIKeyHandler struct {
+	store map[string]store.APIKeyStore
+}
 
-func Create() {
+func NewAPIKeyHandler() *APIKeyHandler {
+	return &APIKeyHandler{
+		store: make(map[string]store.APIKeyStore),
+	}
+}
+
+func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
+	apiKey, err := service.NewAPIKey("free")
+	if err != nil {
+		fmt.Printf("Error creating API key: %v\n", err)
+	}
+
+	newStore := store.NewAPIKeyStore()
+
+	newStore.Create(apiKey)
+
+	response := map[string]string{
+		"message": "API key created successfully",
+		"data": apiKey.Key,
+		"status":  "ok",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(response)
 
 }
 
-func Retrieve() {
+func (h *APIKeyHandler) Retrieve() {
 
 }
 
-func List() {
+func (h *APIKeyHandler) List() {
 
 }
 
-func Delete(){
+func (h *APIKeyHandler) Delete() {
 
 }

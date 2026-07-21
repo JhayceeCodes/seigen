@@ -10,6 +10,7 @@ import (
 func main() {
 
 	http.HandleFunc("/health", handler.Health)
+	http.HandleFunc("/apikeys", handler.NewAPIKeyHandler().Create)
 
 	fmt.Println("Server running on 8080.")
 
