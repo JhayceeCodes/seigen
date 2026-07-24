@@ -28,13 +28,13 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req CreateAPIKeyRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "tier field is required", http.StatusBadRequest)
+		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	apiKey, err := service.NewAPIKey(req.Tier)
 	if err != nil {
-		http.Error(w, "error creating new api key", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -43,7 +43,7 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 	response := APIKeyResponse{
 		Status:  "ok",
 		Message: "API key created successfully",
-		Data:    apiKey.Key,
+		Data:    apiKey,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
