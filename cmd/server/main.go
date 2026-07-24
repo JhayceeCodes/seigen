@@ -16,7 +16,7 @@ func main() {
 	apiKeyStore := store.NewAPIKeyStore()
 	apiKeyHandler := handler.NewAPIKeyHandler(apiKeyStore)
 
-	router.RegisterRoutes(apiKeyHandler)
+	router.RegisterAPIKeyRoutes(apiKeyHandler)
 
 	fmt.Println("Server running on 8080.")
 

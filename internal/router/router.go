@@ -6,6 +6,9 @@ import (
 	"github.com/JhayceeCodes/rate-limiter-gateway/internal/handler"
 )
 
-func RegisterRoutes(apiKeyHandler *handler.APIKeyHandler) {
-	http.HandleFunc("/apikeys", apiKeyHandler.Create)
+func RegisterAPIKeyRoutes(apiKeyHandler *handler.APIKeyHandler) {
+	http.HandleFunc("POST /apikeys", apiKeyHandler.Create)
+	http.HandleFunc("GET /apikeys", apiKeyHandler.List)
+	http.HandleFunc("GET /apikeys/{id}", apiKeyHandler.Retrieve)
+	http.HandleFunc("DELETE /apikeys/{id}", apiKeyHandler.Delete)
 }

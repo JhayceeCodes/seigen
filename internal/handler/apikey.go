@@ -2,9 +2,11 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
+	"github.com/JhayceeCodes/rate-limiter-gateway/internal/model"
 	"github.com/JhayceeCodes/rate-limiter-gateway/internal/service"
 	"github.com/JhayceeCodes/rate-limiter-gateway/internal/store"
 )
@@ -40,7 +42,7 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	h.store.Create(apiKey)
 
-	response := APIKeyResponse{
+	response := APIKeyResponse[model.APIKey]{
 		Status:  "ok",
 		Message: "API key created successfully",
 		Data:    apiKey,
@@ -55,14 +57,35 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *APIKeyHandler) Retrieve() {
+func (h *APIKeyHandler) List(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	keys := h.store.List()
+
+	response := APIKeyResponse[[]model.APIKey]{
+		Status:  "ok",
+		Message: "API keys fetched successfully",
+		Data:    keys,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("failed to encode response: %v", err)
+	}
 
 }
 
-func (h *APIKeyHandler) List() {
+func (h *APIKeyHandler) Retrieve(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	fmt.Println("ID: ", id)
 
 }
 
-func (h *APIKeyHandler) Delete() {
+func (h *APIKeyHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 }
