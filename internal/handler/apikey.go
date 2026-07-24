@@ -25,7 +25,14 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiKey, err := service.NewAPIKey("free")
+	var req CreateAPIKeyRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "tier field is required", http.StatusBadRequest)
+		return
+	}
+
+	apiKey, err := service.NewAPIKey(req.Tier)
 	if err != nil {
 		http.Error(w, "error creating new api key", http.StatusInternalServerError)
 		return
