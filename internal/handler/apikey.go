@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 
@@ -36,7 +35,7 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	apiKey, err := service.NewAPIKey(req.Tier)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -79,13 +78,45 @@ func (h *APIKeyHandler) List(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (h *APIKeyHandler) Retrieve(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+func (h *APIKeyHandler) GetByKey(w http.ResponseWriter, r *http.Request) {
+	key := r.PathValue("key")
 
-	fmt.Println("ID: ", id)
+	apiKey, ok := h.store.Retrieve(key)
+	if !ok {
+		http.Error(w, "api key not found", http.StatusNotFound)
+		return
+	}
 
+	response := APIKeyResponse[model.APIKey]{
+		Status:  "ok",
+		Message: "API keys retrieved successfully",
+		Data:    apiKey,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("failed to encode response: %v", err)
+	}
 }
 
 func (h *APIKeyHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	key := r.PathValue("key")
 
+	ok := h.store.Delete(key)
+	if !ok {
+		http.Error(w, "api key not found", http.StatusNotFound)
+		return
+	}
+
+	response := APIKeyResponse[any]{
+		Status:  "ok",
+		Message: "API key deleted successfully",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("failed to encode response: %v", err)
+	}
 }

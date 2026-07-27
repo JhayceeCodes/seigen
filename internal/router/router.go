@@ -9,6 +9,6 @@ import (
 func RegisterAPIKeyRoutes(apiKeyHandler *handler.APIKeyHandler) {
 	http.HandleFunc("POST /apikeys", apiKeyHandler.Create)
 	http.HandleFunc("GET /apikeys", apiKeyHandler.List)
-	http.HandleFunc("GET /apikeys/{id}", apiKeyHandler.Retrieve)
-	http.HandleFunc("DELETE /apikeys/{id}", apiKeyHandler.Delete)
+	http.HandleFunc("GET /apikeys/{key}", apiKeyHandler.GetByKey)
+	http.HandleFunc("DELETE /apikeys/{key}", apiKeyHandler.Delete)
 }
