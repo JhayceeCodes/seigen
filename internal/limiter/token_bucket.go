@@ -1,48 +1,76 @@
 package limiter
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
-type RateLimiter struct {
-	tokens     chan struct{}
-	refillTime time.Duration
+type TokenBucket struct {
+	capacity       int
+	tokens         int
+	refillAmount   int
+	refillInterval time.Duration
+	lastRefill     time.Time
+	mu             sync.Mutex
 }
 
-
-func NewRateLimiter(capacity int, refillTime time.Duration) *RateLimiter {
-	rl := &RateLimiter{
-		tokens:     make(chan struct{}, capacity),
-		refillTime: refillTime,
+func NewTokenBucket(capacity int, interval time.Duration, amount int) *TokenBucket {
+	if capacity <= 0 {
+		panic("capacity cannot be less than zero")
 	}
 
-	for range capacity {
-		rl.tokens <- struct{}{}
+	if interval <= 0 {
+		panic("interval cannot be less than zero")
 	}
 
-	go rl.startRefill()
+	if amount <= 0 {
+		amount = 1
+	}
 
-	return rl
+	tb := &TokenBucket{
+		capacity:       capacity,
+		refillAmount:   amount,
+		refillInterval: interval,
+	}
+
+	tb.tokens = capacity
+	tb.lastRefill = time.Now()
+
+	go tb.startRefill()
+
+	return tb
 }
 
-func (rl *RateLimiter) startRefill() {
-	ticker := time.NewTicker(rl.refillTime)
+func (tb *TokenBucket) startRefill() {
+	ticker := time.NewTicker(tb.refillInterval)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		select {
-		case rl.tokens <- struct{}{}:
-		default:
+	for t := range ticker.C {
+		tb.mu.Lock()
+
+		if tb.tokens < tb.capacity {
+			tb.tokens += tb.refillAmount
+
+			if tb.tokens > tb.capacity {
+				tb.tokens = tb.capacity
+			}
+
+			tb.lastRefill = t
 		}
+
+		tb.mu.Unlock()
 	}
 }
 
-func (rl *RateLimiter) Allow() bool {
-	select {
-	case <-rl.tokens:
-		return true
-	default:
+func (tb *TokenBucket) Allow() bool {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+
+	if tb.tokens == 0 {
 		return false
 	}
 
+	tb.tokens--
+	return true
+
 }
-
-
