@@ -74,3 +74,10 @@ func (tb *TokenBucket) Allow() bool {
 	return true
 
 }
+
+func (tb *TokenBucket) Tokens() int {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+
+	return tb.tokens
+}
