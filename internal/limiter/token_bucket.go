@@ -11,7 +11,7 @@ type TokenBucket struct {
 	refillAmount   int
 	refillInterval time.Duration
 	lastRefill     time.Time
-	mu             sync.Mutex
+	mu             sync.RWMutex
 }
 
 func NewTokenBucket(capacity int, interval time.Duration, amount int) *TokenBucket {
@@ -76,8 +76,15 @@ func (tb *TokenBucket) Allow() bool {
 }
 
 func (tb *TokenBucket) Tokens() int {
-	tb.mu.Lock()
+	tb.mu.RLock()
 	defer tb.mu.Unlock()
 
 	return tb.tokens
+}
+
+func (tb *TokenBucket) LastRefill() time.Time {
+	tb.mu.RLock()
+	defer tb.mu.Unlock()
+
+	return tb.lastRefill
 }
