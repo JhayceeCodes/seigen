@@ -77,14 +77,14 @@ func (tb *TokenBucket) Allow() bool {
 
 func (tb *TokenBucket) Tokens() int {
 	tb.mu.RLock()
-	defer tb.mu.Unlock()
+	defer tb.mu.RUnlock()
 
 	return tb.tokens
 }
 
 func (tb *TokenBucket) LastRefill() time.Time {
 	tb.mu.RLock()
-	defer tb.mu.Unlock()
+	defer tb.mu.RUnlock()
 
 	return tb.lastRefill
 }

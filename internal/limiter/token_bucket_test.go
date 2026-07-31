@@ -13,8 +13,8 @@ func TestBucketStartsFull(t *testing.T) {
 		1,
 	)
 
-	if bucket.tokens != 5 {
-		t.Errorf("expected 5 tokens, got %d", bucket.tokens)
+	if bucket.Tokens() != 5 {
+		t.Errorf("expected 5 tokens, got %d", bucket.Tokens())
 	}
 
 }
@@ -29,10 +29,10 @@ func TestAllowConsumesOneToken(t *testing.T) {
 
 	bucket.Allow()
 
-	if bucket.tokens != 4 {
+	if bucket.Tokens() != 4 {
 		t.Errorf(
 			"expected 4 tokens, got %d",
-			bucket.tokens,
+			bucket.Tokens(),
 		)
 	}
 
