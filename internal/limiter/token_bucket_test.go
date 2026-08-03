@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestBucketStartsFull(t *testing.T) {
+func TestTokenBucketStartsFull(t *testing.T) {
 
 	bucket := NewTokenBucket(
 		5,
@@ -19,7 +19,7 @@ func TestBucketStartsFull(t *testing.T) {
 
 }
 
-func TestAllowConsumesOneToken(t *testing.T) {
+func TestTokenBucketAllowConsumesOneToken(t *testing.T) {
 
 	bucket := NewTokenBucket(
 		5,
@@ -38,7 +38,7 @@ func TestAllowConsumesOneToken(t *testing.T) {
 
 }
 
-func TestRejectWhenEmpty(t *testing.T) {
+func TestTokenBucketRejectWhenEmpty(t *testing.T) {
 
 	bucket := NewTokenBucket(
 		1,
@@ -56,7 +56,7 @@ func TestRejectWhenEmpty(t *testing.T) {
 
 }
 
-func TestRefill(t *testing.T) {
+func TestTokenBucketRefill(t *testing.T) {
 
 	bucket := NewTokenBucket(
 		2,
