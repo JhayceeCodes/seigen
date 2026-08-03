@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestNewWindowStartsWithZeroRequests(t *testing.T) {
+func TestNewFixedWindowStartsWithZeroRequests(t *testing.T) {
 	window := NewFixedWindow(
 		5,
 		time.Second,
@@ -18,7 +18,7 @@ func TestNewWindowStartsWithZeroRequests(t *testing.T) {
 	}
 }
 
-func TestNewWindowStartsWithFullCapacity(t *testing.T) {
+func TestNewFixedWindowStartsWithFullCapacity(t *testing.T) {
 	window := NewFixedWindow(
 		10,
 		time.Second,
@@ -33,7 +33,7 @@ func TestNewWindowStartsWithFullCapacity(t *testing.T) {
 
 }
 
-func TestAllowDecrementsRemaining(t *testing.T) {
+func TestFixedWindowAllowDecrementsRemaining(t *testing.T) {
 	limit := 10
 	window := NewFixedWindow(
 		limit,
@@ -51,7 +51,7 @@ func TestAllowDecrementsRemaining(t *testing.T) {
 	}
 }
 
-func TestAllowRejectsWhenLimitReached(t *testing.T) {
+func TestFixedWindowAllowRejectsWhenLimitReached(t *testing.T) {
 	window := NewFixedWindow(
 		2,
 		time.Second,
@@ -70,7 +70,7 @@ func TestAllowRejectsWhenLimitReached(t *testing.T) {
 	}
 }
 
-func TestWindowResetsAfterInterval(t *testing.T) {
+func TestFixedWindowResetsAfterInterval(t *testing.T) {
 	window := NewFixedWindow(
 		2,
 		time.Second,
@@ -86,7 +86,7 @@ func TestWindowResetsAfterInterval(t *testing.T) {
 	}
 }
 
-func TestAllowIsConcurrentSafe(t *testing.T) {
+func TestFixedWindowAllowIsConcurrentSafe(t *testing.T) {
 	window := NewFixedWindow(
 		5,
 		time.Second,
