@@ -7,14 +7,8 @@ import (
 	"time"
 )
 
-// construction starts with zero requests
-// concurrency safety
-
 func TestNewSlidingWindowStartsWithZeroRequests(t *testing.T) {
-	window := NewSlidingWindow(
-		5,
-		time.Second,
-	)
+	window := NewSlidingWindow(5, time.Second)
 
 	if window.Requests() != 0 {
 		t.Fatalf("expected zero requests, got %d", window.Requests())
@@ -22,10 +16,7 @@ func TestNewSlidingWindowStartsWithZeroRequests(t *testing.T) {
 }
 
 func TestSlidingWindowAllowIsConcurrentSafe(t *testing.T) {
-	window := NewFixedWindow(
-		5,
-		time.Second,
-	)
+	window := NewSlidingWindow(5, time.Second)
 
 	var successful atomic.Int32
 	var wg sync.WaitGroup
@@ -43,5 +34,129 @@ func TestSlidingWindowAllowIsConcurrentSafe(t *testing.T) {
 
 	if successful.Load() != 5 {
 		t.Errorf("expected 5 successful requests, got %d", successful.Load())
+	}
+
+}
+
+func TestSlidingWindowStartsFull(t *testing.T) {
+	limit := 5
+
+	window := NewSlidingWindow(limit, time.Second)
+
+	if window.Remaining() != limit {
+		t.Errorf(
+			"expected %d remaining, got %d",
+			limit,
+			window.Remaining(),
+		)
+	}
+}
+
+func TestSlidingWindowAllowRecordsRequests(t *testing.T) {
+	window := NewSlidingWindow(5, time.Second)
+
+	window.Allow()
+
+	if window.Requests() != 1 {
+		t.Fatalf(
+			"expected 1 request, got %d",
+			window.Requests(),
+		)
+	}
+
+	if window.Remaining() != 4 {
+		t.Fatalf(
+			"expected 4 remaining, got %d",
+			window.Remaining(),
+		)
+	}
+}
+
+func TestSlidingWindowLimitIsEnforced(t *testing.T) {
+	window := NewSlidingWindow(2, time.Second)
+
+	window.Allow()
+	window.Allow()
+
+	if window.Allow() {
+		t.Error("expected rejected request")
+	}
+}
+
+func TestSlidingWindowExpiredRequestsAreRemoved(t *testing.T) {
+	window := NewSlidingWindow(2, 100*time.Millisecond)
+
+	window.Allow()
+
+	time.Sleep(150 * time.Millisecond)
+
+	window.Allow()
+	if window.Requests() != 1 {
+		t.Fatalf(
+			"expected 1 active request after cleanup, got %d",
+			window.Requests(),
+		)
+	}
+}
+
+func TestSlidingWindowRemainingResetsAfterExpiration(t *testing.T) {
+	window := NewSlidingWindow(2, 100*time.Millisecond)
+
+	window.Allow()
+
+	time.Sleep(150 * time.Millisecond)
+
+	if window.Remaining() != 2 {
+		t.Fatalf(
+			"expected full remaining capacity, got %d",
+			window.Remaining(),
+		)
+	}
+}
+
+func TestNewSlidingWindowRejectsInvalidLimit(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic")
+		}
+	}()
+
+	window := NewSlidingWindow(-1, time.Second)
+
+	window.Allow()
+}
+
+func TestNewSlidingWindowRejectsInvalidWindow(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic")
+		}
+	}()
+
+	window := NewSlidingWindow(1, -1*time.Second)
+
+	window.Allow()
+}
+
+func TestSlidingWindowExpiresOnlyOldRequests(t *testing.T) {
+	window := NewSlidingWindow(2, 100*time.Millisecond)
+
+	window.Allow()
+
+	time.Sleep(60 * time.Millisecond)
+
+	window.Allow()
+
+	time.Sleep(60 * time.Millisecond)
+
+	if !window.Allow() {
+		t.Fatal("expected request to be allowed")
+	}
+
+	if window.Requests() != 2 {
+		t.Fatalf(
+			"expected 2 active requests, got %d",
+			window.Requests(),
+		)
 	}
 }
