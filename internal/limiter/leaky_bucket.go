@@ -18,6 +18,13 @@ type LeakyBucket struct {
 	mu           sync.RWMutex
 }
 
+// NewLeakyBucket creates a leaky bucket rate limiter.
+//
+// capacity is the maximum number of queued requests.
+//
+// interval specifies how frequently one queued request is processed.
+//
+// A background goroutine is started to leak one request every interval.
 func NewLeakyBucket(capacity int, interval time.Duration) *LeakyBucket {
 	if capacity <= 0 {
 		panic("capacity cannot be less than zero")

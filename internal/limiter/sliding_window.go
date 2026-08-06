@@ -12,6 +12,13 @@ type SlidingWindow struct {
 	mu       sync.Mutex
 }
 
+
+
+// NewSlidingWindow creates a sliding window rate limiter.
+//
+// limit is the maximum number of requests allowed within the rolling time window.
+//
+// window specifies the duration over which requests are tracked.
 func NewSlidingWindow(limit int, window time.Duration) *SlidingWindow {
 	if limit <= 0 {
 		panic("capacity cannot be less than zero")

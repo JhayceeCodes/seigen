@@ -14,6 +14,17 @@ type TokenBucket struct {
 	mu             sync.RWMutex
 }
 
+
+// NewTokenBucket creates a new token bucket rate limiter.
+//
+// capacity defines the maximum number of tokens the bucket can hold.
+//
+// interval specifies how often tokens are replenished.
+//
+// amount specifies how many tokens are added every refill interval.
+// If amount is less than or equal to zero, it defaults to 1.
+//
+// A background goroutine is started to replenish tokens periodically.
 func NewTokenBucket(capacity int, interval time.Duration, amount int) *TokenBucket {
 	if capacity <= 0 {
 		panic("capacity cannot be less than zero")

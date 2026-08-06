@@ -13,6 +13,11 @@ type FixedWindow struct {
 	mu        sync.RWMutex
 }
 
+// NewFixedWindow creates a fixed window rate limiter.
+//
+// limit is the maximum number of requests allowed during each window.
+//
+// window specifies the duration of a single rate-limiting window.
 func NewFixedWindow(limit int, window time.Duration) *FixedWindow {
 	if limit <= 0 {
 		panic("capacity cannot be less than zero")
