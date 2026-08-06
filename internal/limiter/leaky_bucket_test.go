@@ -84,7 +84,7 @@ func TestMultipleLeaks(t *testing.T) {
 	bucket.Allow()
 	bucket.Allow()
 
-	time.Sleep(3000 * time.Second + 300 * time.Millisecond)
+	time.Sleep(3300 * time.Millisecond)
 
 	if bucket.Requests() != 2 {
 		t.Errorf("expected 2 requests left, got %d", bucket.Requests())
