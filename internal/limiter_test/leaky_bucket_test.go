@@ -1,14 +1,16 @@
-package limiter
+package limiter_test
 
 import (
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/JhayceeCodes/rate-limiter-gateway/internal/limiter"
 )
 
 func TestNewLeakyBucketStartsEmpty(t *testing.T) {
-	bucket := NewLeakyBucket(
+	bucket := limiter.NewLeakyBucket(
 		10,
 		5*time.Second,
 	)
@@ -23,7 +25,7 @@ func TestNewLeakyBucketStartsEmpty(t *testing.T) {
 }
 
 func TestAllowAddsRequest(t *testing.T) {
-	bucket := NewLeakyBucket(
+	bucket := limiter.NewLeakyBucket(
 		10,
 		5*time.Second,
 	)
@@ -40,7 +42,7 @@ func TestAllowAddsRequest(t *testing.T) {
 }
 
 func TestCapacityIsEnforced(t *testing.T) {
-	bucket := NewLeakyBucket(
+	bucket := limiter.NewLeakyBucket(
 		2,
 		5*time.Second,
 	)
@@ -54,7 +56,7 @@ func TestCapacityIsEnforced(t *testing.T) {
 }
 
 func TestLeakRemovesOneRequest(t *testing.T) {
-	bucket := NewLeakyBucket(
+	bucket := limiter.NewLeakyBucket(
 		5,
 		time.Second,
 	)
@@ -73,7 +75,7 @@ func TestLeakRemovesOneRequest(t *testing.T) {
 }
 
 func TestMultipleLeaks(t *testing.T) {
-	bucket := NewLeakyBucket(
+	bucket := limiter.NewLeakyBucket(
 		5,
 		time.Second,
 	)
@@ -98,7 +100,7 @@ func TestNewLeakyBucketRejectsInvalidLimit(t *testing.T) {
 		}
 	}()
 
-	NewLeakyBucket(-1, time.Second)
+	limiter.NewLeakyBucket(-1, time.Second)
 
 }
 
@@ -109,11 +111,11 @@ func TestNewLeakyBucketRejectsInvalidWindow(t *testing.T) {
 		}
 	}()
 
-	NewLeakyBucket(1, -1*time.Second)
+	limiter.NewLeakyBucket(1, -1*time.Second)
 }
 
 func TestCanAllowAfterLeak(t *testing.T) {
-	bucket := NewLeakyBucket(2, 100*time.Millisecond)
+	bucket := limiter.NewLeakyBucket(2, 100*time.Millisecond)
 
 	bucket.Allow()
 	bucket.Allow()
@@ -130,7 +132,7 @@ func TestCanAllowAfterLeak(t *testing.T) {
 }
 
 func TestLeakyBucketAllowIsConcurrentSafe(t *testing.T) {
-	bucket := NewLeakyBucket(5, 100*time.Millisecond)
+	bucket := limiter.NewLeakyBucket(5, 100*time.Millisecond)
 
 	var successful atomic.Int32
 	var wg sync.WaitGroup
@@ -152,7 +154,7 @@ func TestLeakyBucketAllowIsConcurrentSafe(t *testing.T) {
 }
 
 func TestRemainingUpdatesAfterLeak(t *testing.T) {
-	bucket := NewLeakyBucket(2, 100*time.Millisecond)
+	bucket := limiter.NewLeakyBucket(2, 100*time.Millisecond)
 
 	bucket.Allow()
 	bucket.Allow()

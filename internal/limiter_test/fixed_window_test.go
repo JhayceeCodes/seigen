@@ -1,14 +1,16 @@
-package limiter
+package limiter_test
 
 import (
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/JhayceeCodes/rate-limiter-gateway/internal/limiter"
 )
 
 func TestNewFixedWindowStartsWithZeroRequests(t *testing.T) {
-	window := NewFixedWindow(
+	window := limiter.NewFixedWindow(
 		5,
 		time.Second,
 	)
@@ -19,7 +21,7 @@ func TestNewFixedWindowStartsWithZeroRequests(t *testing.T) {
 }
 
 func TestNewFixedWindowStartsWithFullCapacity(t *testing.T) {
-	window := NewFixedWindow(
+	window := limiter.NewFixedWindow(
 		10,
 		time.Second,
 	)
@@ -35,7 +37,7 @@ func TestNewFixedWindowStartsWithFullCapacity(t *testing.T) {
 
 func TestFixedWindowAllowDecrementsRemaining(t *testing.T) {
 	limit := 10
-	window := NewFixedWindow(
+	window := limiter.NewFixedWindow(
 		limit,
 		time.Second,
 	)
@@ -52,7 +54,7 @@ func TestFixedWindowAllowDecrementsRemaining(t *testing.T) {
 }
 
 func TestFixedWindowAllowRejectsWhenLimitReached(t *testing.T) {
-	window := NewFixedWindow(
+	window := limiter.NewFixedWindow(
 		2,
 		time.Second,
 	)
@@ -71,7 +73,7 @@ func TestFixedWindowAllowRejectsWhenLimitReached(t *testing.T) {
 }
 
 func TestFixedWindowResetsAfterInterval(t *testing.T) {
-	window := NewFixedWindow(
+	window := limiter.NewFixedWindow(
 		2,
 		time.Second,
 	)
@@ -87,7 +89,7 @@ func TestFixedWindowResetsAfterInterval(t *testing.T) {
 }
 
 func TestFixedWindowAllowIsConcurrentSafe(t *testing.T) {
-	window := NewFixedWindow(
+	window := limiter.NewFixedWindow(
 		5,
 		time.Second,
 	)

@@ -1,13 +1,15 @@
-package limiter
+package limiter_test
 
 import (
 	"testing"
 	"time"
+
+	"github.com/JhayceeCodes/rate-limiter-gateway/internal/limiter"
 )
 
 func TestTokenBucketStartsFull(t *testing.T) {
 
-	bucket := NewTokenBucket(
+	bucket := limiter.NewTokenBucket(
 		5,
 		time.Second,
 		1,
@@ -21,7 +23,7 @@ func TestTokenBucketStartsFull(t *testing.T) {
 
 func TestTokenBucketAllowConsumesOneToken(t *testing.T) {
 
-	bucket := NewTokenBucket(
+	bucket := limiter.NewTokenBucket(
 		5,
 		time.Second,
 		1,
@@ -40,7 +42,7 @@ func TestTokenBucketAllowConsumesOneToken(t *testing.T) {
 
 func TestTokenBucketRejectWhenEmpty(t *testing.T) {
 
-	bucket := NewTokenBucket(
+	bucket := limiter.NewTokenBucket(
 		1,
 		time.Second,
 		1,
@@ -58,7 +60,7 @@ func TestTokenBucketRejectWhenEmpty(t *testing.T) {
 
 func TestTokenBucketRefill(t *testing.T) {
 
-	bucket := NewTokenBucket(
+	bucket := limiter.NewTokenBucket(
 		2,
 		time.Second,
 		1,

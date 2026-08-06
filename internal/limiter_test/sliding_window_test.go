@@ -1,14 +1,16 @@
-package limiter
+package limiter_test
 
 import (
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/JhayceeCodes/rate-limiter-gateway/internal/limiter"
 )
 
 func TestNewSlidingWindowStartsWithZeroRequests(t *testing.T) {
-	window := NewSlidingWindow(5, time.Second)
+	window := limiter.NewSlidingWindow(5, time.Second)
 
 	if window.Requests() != 0 {
 		t.Fatalf("expected zero requests, got %d", window.Requests())
@@ -16,7 +18,7 @@ func TestNewSlidingWindowStartsWithZeroRequests(t *testing.T) {
 }
 
 func TestSlidingWindowAllowIsConcurrentSafe(t *testing.T) {
-	window := NewSlidingWindow(5, time.Second)
+	window := limiter.NewSlidingWindow(5, time.Second)
 
 	var successful atomic.Int32
 	var wg sync.WaitGroup
@@ -41,7 +43,7 @@ func TestSlidingWindowAllowIsConcurrentSafe(t *testing.T) {
 func TestSlidingWindowStartsFull(t *testing.T) {
 	limit := 5
 
-	window := NewSlidingWindow(limit, time.Second)
+	window := limiter.NewSlidingWindow(limit, time.Second)
 
 	if window.Remaining() != limit {
 		t.Errorf(
@@ -53,7 +55,7 @@ func TestSlidingWindowStartsFull(t *testing.T) {
 }
 
 func TestSlidingWindowAllowRecordsRequests(t *testing.T) {
-	window := NewSlidingWindow(5, time.Second)
+	window := limiter.NewSlidingWindow(5, time.Second)
 
 	window.Allow()
 
@@ -73,7 +75,7 @@ func TestSlidingWindowAllowRecordsRequests(t *testing.T) {
 }
 
 func TestSlidingWindowLimitIsEnforced(t *testing.T) {
-	window := NewSlidingWindow(2, time.Second)
+	window := limiter.NewSlidingWindow(2, time.Second)
 
 	window.Allow()
 	window.Allow()
@@ -84,7 +86,7 @@ func TestSlidingWindowLimitIsEnforced(t *testing.T) {
 }
 
 func TestSlidingWindowExpiredRequestsAreRemoved(t *testing.T) {
-	window := NewSlidingWindow(2, 100*time.Millisecond)
+	window := limiter.NewSlidingWindow(2, 100*time.Millisecond)
 
 	window.Allow()
 
@@ -100,7 +102,7 @@ func TestSlidingWindowExpiredRequestsAreRemoved(t *testing.T) {
 }
 
 func TestSlidingWindowRemainingResetsAfterExpiration(t *testing.T) {
-	window := NewSlidingWindow(2, 100*time.Millisecond)
+	window := limiter.NewSlidingWindow(2, 100*time.Millisecond)
 
 	window.Allow()
 
@@ -121,7 +123,7 @@ func TestNewSlidingWindowRejectsInvalidLimit(t *testing.T) {
 		}
 	}()
 
-	window := NewSlidingWindow(-1, time.Second)
+	window := limiter.NewSlidingWindow(-1, time.Second)
 
 	window.Allow()
 }
@@ -133,13 +135,13 @@ func TestNewSlidingWindowRejectsInvalidWindow(t *testing.T) {
 		}
 	}()
 
-	window := NewSlidingWindow(1, -1*time.Second)
+	window := limiter.NewSlidingWindow(1, -1*time.Second)
 
 	window.Allow()
 }
 
 func TestSlidingWindowExpiresOnlyOldRequests(t *testing.T) {
-	window := NewSlidingWindow(2, 100*time.Millisecond)
+	window := limiter.NewSlidingWindow(2, 100*time.Millisecond)
 
 	window.Allow()
 
