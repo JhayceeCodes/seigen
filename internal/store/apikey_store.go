@@ -3,7 +3,7 @@ package store
 import (
 	"sync"
 
-	"github.com/JhayceeCodes/rate-limiter-gateway/internal/model"
+	"github.com/JhayceeCodes/seigen/internal/model"
 )
 
 // APIKeyStore stores API keys in memory.

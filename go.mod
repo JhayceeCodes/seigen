@@ -1,3 +1,3 @@
-module github.com/JhayceeCodes/rate-limiter-gateway
+module github.com/JhayceeCodes/seigen
 
 go 1.25.5

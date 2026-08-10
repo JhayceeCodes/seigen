@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/JhayceeCodes/rate-limiter-gateway/internal/model"
+	"github.com/JhayceeCodes/seigen/internal/model"
 )
 
 func NewAPIKey(tier string) (model.APIKey, error) {

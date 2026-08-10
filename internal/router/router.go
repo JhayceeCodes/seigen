@@ -3,7 +3,7 @@ package router
 import (
 	"net/http"
 
-	"github.com/JhayceeCodes/rate-limiter-gateway/internal/handler"
+	"github.com/JhayceeCodes/seigen/internal/handler"
 )
 
 func RegisterAPIKeyRoutes(apiKeyHandler *handler.APIKeyHandler) {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/JhayceeCodes/rate-limiter-gateway/internal/handler"
-	"github.com/JhayceeCodes/rate-limiter-gateway/internal/router"
-	"github.com/JhayceeCodes/rate-limiter-gateway/internal/store"
+	"github.com/JhayceeCodes/seigen/internal/handler"
+	"github.com/JhayceeCodes/seigen/internal/router"
+	"github.com/JhayceeCodes/seigen/internal/store"
 )
 
 func main() {

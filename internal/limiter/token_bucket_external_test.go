@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JhayceeCodes/rate-limiter-gateway/internal/limiter"
+	"github.com/JhayceeCodes/seigen/internal/limiter"
 )
 
 func TestTokenBucketStartsFull(t *testing.T) {

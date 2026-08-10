@@ -5,9 +5,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/JhayceeCodes/rate-limiter-gateway/internal/model"
-	"github.com/JhayceeCodes/rate-limiter-gateway/internal/service"
-	"github.com/JhayceeCodes/rate-limiter-gateway/internal/store"
+	"github.com/JhayceeCodes/seigen/internal/model"
+	"github.com/JhayceeCodes/seigen/internal/service"
+	"github.com/JhayceeCodes/seigen/internal/store"
 )
 
 type APIKeyHandler struct {
