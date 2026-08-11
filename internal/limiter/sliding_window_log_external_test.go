@@ -9,16 +9,16 @@ import (
 	"github.com/JhayceeCodes/seigen/internal/limiter"
 )
 
-func TestNewSlidingWindowStartsWithZeroRequests(t *testing.T) {
-	window := limiter.NewSlidingWindow(5, time.Second)
+func TestNewSlidingWindowLogStartsWithZeroRequests(t *testing.T) {
+	window := limiter.NewSlidingWindowLog(5, time.Second)
 
 	if window.Requests() != 0 {
 		t.Fatalf("expected zero requests, got %d", window.Requests())
 	}
 }
 
-func TestSlidingWindowAllowIsConcurrentSafe(t *testing.T) {
-	window := limiter.NewSlidingWindow(5, time.Second)
+func TestSlidingWindowLogAllowIsConcurrentSafe(t *testing.T) {
+	window := limiter.NewSlidingWindowLog(5, time.Second)
 
 	var successful atomic.Int32
 	var wg sync.WaitGroup
@@ -40,10 +40,10 @@ func TestSlidingWindowAllowIsConcurrentSafe(t *testing.T) {
 
 }
 
-func TestSlidingWindowStartsFull(t *testing.T) {
+func TestSlidingWindowLogStartsFull(t *testing.T) {
 	limit := 5
 
-	window := limiter.NewSlidingWindow(limit, time.Second)
+	window := limiter.NewSlidingWindowLog(limit, time.Second)
 
 	if window.Remaining() != limit {
 		t.Errorf(
@@ -54,8 +54,8 @@ func TestSlidingWindowStartsFull(t *testing.T) {
 	}
 }
 
-func TestSlidingWindowAllowRecordsRequests(t *testing.T) {
-	window := limiter.NewSlidingWindow(5, time.Second)
+func TestSlidingWindowLogAllowRecordsRequests(t *testing.T) {
+	window := limiter.NewSlidingWindowLog(5, time.Second)
 
 	window.Allow()
 
@@ -74,8 +74,8 @@ func TestSlidingWindowAllowRecordsRequests(t *testing.T) {
 	}
 }
 
-func TestSlidingWindowLimitIsEnforced(t *testing.T) {
-	window := limiter.NewSlidingWindow(2, time.Second)
+func TestSlidingWindowLogLimitIsEnforced(t *testing.T) {
+	window := limiter.NewSlidingWindowLog(2, time.Second)
 
 	window.Allow()
 	window.Allow()
@@ -85,8 +85,8 @@ func TestSlidingWindowLimitIsEnforced(t *testing.T) {
 	}
 }
 
-func TestSlidingWindowExpiredRequestsAreRemoved(t *testing.T) {
-	window := limiter.NewSlidingWindow(2, 100*time.Millisecond)
+func TestSlidingWindowLogExpiredRequestsAreRemoved(t *testing.T) {
+	window := limiter.NewSlidingWindowLog(2, 100*time.Millisecond)
 
 	window.Allow()
 
@@ -101,8 +101,8 @@ func TestSlidingWindowExpiredRequestsAreRemoved(t *testing.T) {
 	}
 }
 
-func TestSlidingWindowRemainingResetsAfterExpiration(t *testing.T) {
-	window := limiter.NewSlidingWindow(2, 100*time.Millisecond)
+func TestSlidingWindowLogRemainingResetsAfterExpiration(t *testing.T) {
+	window := limiter.NewSlidingWindowLog(2, 100*time.Millisecond)
 
 	window.Allow()
 
@@ -116,32 +116,32 @@ func TestSlidingWindowRemainingResetsAfterExpiration(t *testing.T) {
 	}
 }
 
-func TestNewSlidingWindowRejectsInvalidLimit(t *testing.T) {
+func TestNewSlidingWindowLogRejectsInvalidLimit(t *testing.T) {
 	defer func() {
 		if recover() == nil {
 			t.Fatal("expected panic")
 		}
 	}()
 
-	window := limiter.NewSlidingWindow(-1, time.Second)
+	window := limiter.NewSlidingWindowLog(-1, time.Second)
 
 	window.Allow()
 }
 
-func TestNewSlidingWindowRejectsInvalidWindow(t *testing.T) {
+func TestNewSlidingWindowLogRejectsInvalidWindow(t *testing.T) {
 	defer func() {
 		if recover() == nil {
 			t.Fatal("expected panic")
 		}
 	}()
 
-	window := limiter.NewSlidingWindow(1, -1*time.Second)
+	window := limiter.NewSlidingWindowLog(1, -1*time.Second)
 
 	window.Allow()
 }
 
-func TestSlidingWindowExpiresOnlyOldRequests(t *testing.T) {
-	window := limiter.NewSlidingWindow(2, 100*time.Millisecond)
+func TestSlidingWindowLogExpiresOnlyOldRequests(t *testing.T) {
+	window := limiter.NewSlidingWindowLog(2, 100*time.Millisecond)
 
 	window.Allow()
 

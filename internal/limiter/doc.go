@@ -4,7 +4,8 @@
 //
 //   - Token Bucket
 //   - Fixed Window
-//   - Sliding Window
+//   - Sliding Window Log
+//	 - Sliding Window Counter
 //   - Leaky Bucket
 //
 // The package is designed to be embedded into HTTP middleware and other

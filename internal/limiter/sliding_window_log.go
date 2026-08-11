@@ -5,21 +5,19 @@ import (
 	"time"
 )
 
-type SlidingWindow struct {
+type SlidingWindowLog struct {
 	requests []time.Time
 	limit    int
 	window   time.Duration
-	mu       sync.Mutex
+	mu       sync.RWMutex
 }
 
-
-
-// NewSlidingWindow creates a sliding window rate limiter.
+// NewSlidingWindowLog creates a sliding window rate limiter.
 //
 // limit is the maximum number of requests allowed within the rolling time window.
 //
 // window specifies the duration over which requests are tracked.
-func NewSlidingWindow(limit int, window time.Duration) *SlidingWindow {
+func NewSlidingWindowLog(limit int, window time.Duration) *SlidingWindowLog {
 	if limit <= 0 {
 		panic("capacity cannot be less than zero")
 	}
@@ -28,7 +26,7 @@ func NewSlidingWindow(limit int, window time.Duration) *SlidingWindow {
 		panic("window must be greater than zero")
 	}
 
-	return &SlidingWindow{
+	return &SlidingWindowLog{
 		limit:  limit,
 		window: window,
 	}
@@ -37,39 +35,39 @@ func NewSlidingWindow(limit int, window time.Duration) *SlidingWindow {
 // cleanUp removes expired timestamps.
 //
 // Caller must hold sw.mu.
-func (sw *SlidingWindow) cleanUp() {
+func (swc *SlidingWindowLog) cleanUp() {
 	currentTime := time.Now()
 
-	cutoff := currentTime.Add(-sw.window)
+	cutoff := currentTime.Add(-swc.window)
 
-	for len(sw.requests) > 0 {
-		if sw.requests[0].Before(cutoff) {
-			sw.requests = sw.requests[1:]
+	for len(swc.requests) > 0 {
+		if swc.requests[0].Before(cutoff) {
+			swc.requests = swc.requests[1:]
 		} else {
 			break
 		}
 	}
 }
 
-func (sw *SlidingWindow) Allow() bool {
-	sw.mu.Lock()
-	defer sw.mu.Unlock()
+func (swc *SlidingWindowLog) Allow() bool {
+	swc.mu.Lock()
+	defer swc.mu.Unlock()
 
-	sw.cleanUp()
+	swc.cleanUp()
 
-	if len(sw.requests) >= sw.limit {
+	if len(swc.requests) >= swc.limit {
 		return false
 	}
 
-	sw.requests = append(sw.requests, time.Now())
+	swc.requests = append(swc.requests, time.Now())
 	return true
 }
 
 // Requests returns the number of active requests
 // after removing expired timestamps.
-func (sw *SlidingWindow) Requests() int {
-	sw.mu.Lock()
-	defer sw.mu.Unlock()
+func (sw *SlidingWindowLog) Requests() int {
+	sw.mu.RLock()
+	defer sw.mu.RUnlock()
 
 	sw.cleanUp()
 
@@ -78,11 +76,11 @@ func (sw *SlidingWindow) Requests() int {
 
 // Remaining returns the remaining request capacity
 // in the current sliding window.
-func (sw *SlidingWindow) Remaining() int {
-	sw.mu.Lock()
-	defer sw.mu.Unlock()
+func (swc *SlidingWindowLog) Remaining() int {
+	swc.mu.RLock()
+	defer swc.mu.RUnlock()
 
-	sw.cleanUp()
+	swc.cleanUp()
 
-	return sw.limit - len(sw.requests)
+	return swc.limit - len(swc.requests)
 }
