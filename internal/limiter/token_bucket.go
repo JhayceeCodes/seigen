@@ -14,7 +14,6 @@ type TokenBucket struct {
 	mu             sync.Mutex
 }
 
-
 // NewTokenBucket creates a new token bucket rate limiter.
 //
 // capacity defines the maximum number of tokens the bucket can hold.
@@ -24,7 +23,8 @@ type TokenBucket struct {
 // amount specifies how many tokens are added every refill interval.
 // If amount is less than or equal to zero, it defaults to 1.
 //
-// A background goroutine is started to replenish tokens periodically.
+// Refills are computed lazily based on elapsed time whenever the bucket
+// is accessed, rather than by a background goroutine.
 func NewTokenBucket(capacity int, interval time.Duration, amount int) *TokenBucket {
 	if capacity <= 0 {
 		panic("capacity cannot be less than zero")
@@ -38,7 +38,6 @@ func NewTokenBucket(capacity int, interval time.Duration, amount int) *TokenBuck
 		amount = 1
 	}
 
-	
 	return &TokenBucket{
 		capacity:       capacity,
 		tokens:         capacity,
@@ -47,7 +46,6 @@ func NewTokenBucket(capacity int, interval time.Duration, amount int) *TokenBuck
 		lastRefill:     time.Now(),
 	}
 }
-
 
 func (tb *TokenBucket) refill() {
 	elapsed := time.Since(tb.lastRefill)
@@ -64,7 +62,6 @@ func (tb *TokenBucket) refill() {
 
 	tb.lastRefill = tb.lastRefill.Add(time.Duration(intervalsPassed) * tb.refillInterval)
 }
-
 
 func (tb *TokenBucket) Allow() bool {
 	tb.mu.Lock()
