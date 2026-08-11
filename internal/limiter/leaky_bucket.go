@@ -15,16 +15,15 @@ type LeakyBucket struct {
 	capacity     int
 	queue        []time.Time
 	leakInterval time.Duration
-	mu           sync.RWMutex
+	lastLeak     time.Time
+	mu           sync.Mutex
 }
 
 // NewLeakyBucket creates a leaky bucket rate limiter.
 //
 // capacity is the maximum number of queued requests.
 //
-// interval specifies how frequently one queued request is processed.
-//
-// A background goroutine is started to leak one request every interval.
+// interval specifies how frequently one queued request is considered leaked.
 func NewLeakyBucket(capacity int, interval time.Duration) *LeakyBucket {
 	if capacity <= 0 {
 		panic("capacity cannot be less than zero")
@@ -34,36 +33,36 @@ func NewLeakyBucket(capacity int, interval time.Duration) *LeakyBucket {
 		panic("interval cannot be less than zero")
 	}
 
-	lb := &LeakyBucket{
+	return &LeakyBucket{
 		capacity:     capacity,
 		leakInterval: interval,
-	}
-
-	// Start the background worker that leaks one queued request
-	// every leakInterval.
-	go lb.startLeak()
-
-	return lb
-}
-
-func (lb *LeakyBucket) startLeak() {
-	ticker := time.NewTicker(lb.leakInterval)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		lb.mu.Lock()
-
-		if len(lb.queue) > 0 {
-			lb.queue = lb.queue[1:]
-		}
-
-		lb.mu.Unlock()
+		lastLeak:     time.Now(),
 	}
 }
+
+func (lb *LeakyBucket) leak() {
+	elapsed := time.Since(lb.lastLeak)
+	leaked := int(elapsed / lb.leakInterval)
+
+	if leaked <= 0 {
+		return
+	}
+
+	if leaked >= len(lb.queue) {
+		lb.queue = lb.queue[:0]
+	} else {
+		lb.queue = lb.queue[leaked:]
+	}
+
+	lb.lastLeak = lb.lastLeak.Add(time.Duration(leaked) * lb.leakInterval)
+}
+
 
 func (lb *LeakyBucket) Allow() bool {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
+
+	lb.leak()
 
 	if len(lb.queue) >= lb.capacity {
 		return false
@@ -73,16 +72,20 @@ func (lb *LeakyBucket) Allow() bool {
 	return true
 }
 
+// Requests returns the number of active (unleaked) requests in the bucket.
 func (lb *LeakyBucket) Requests() int {
-	lb.mu.RLock()
-	defer lb.mu.RUnlock()
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
 
+	lb.leak()
 	return len(lb.queue)
 }
 
+// Remaining returns the remaining queue capacity in the bucket.
 func (lb *LeakyBucket) Remaining() int {
-	lb.mu.RLock()
-	defer lb.mu.RUnlock()
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
 
+	lb.leak()
 	return lb.capacity - len(lb.queue)
 }

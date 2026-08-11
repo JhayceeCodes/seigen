@@ -11,7 +11,7 @@ type TokenBucket struct {
 	refillAmount   int
 	refillInterval time.Duration
 	lastRefill     time.Time
-	mu             sync.RWMutex
+	mu             sync.Mutex
 }
 
 
@@ -38,44 +38,39 @@ func NewTokenBucket(capacity int, interval time.Duration, amount int) *TokenBuck
 		amount = 1
 	}
 
-	tb := &TokenBucket{
+	
+	return &TokenBucket{
 		capacity:       capacity,
+		tokens:         capacity,
 		refillAmount:   amount,
 		refillInterval: interval,
-	}
-
-	tb.tokens = capacity
-	tb.lastRefill = time.Now()
-
-	go tb.startRefill()
-
-	return tb
-}
-
-func (tb *TokenBucket) startRefill() {
-	ticker := time.NewTicker(tb.refillInterval)
-	defer ticker.Stop()
-
-	for t := range ticker.C {
-		tb.mu.Lock()
-
-		if tb.tokens < tb.capacity {
-			tb.tokens += tb.refillAmount
-
-			if tb.tokens > tb.capacity {
-				tb.tokens = tb.capacity
-			}
-
-			tb.lastRefill = t
-		}
-
-		tb.mu.Unlock()
+		lastRefill:     time.Now(),
 	}
 }
+
+
+func (tb *TokenBucket) refill() {
+	elapsed := time.Since(tb.lastRefill)
+	intervalsPassed := int(elapsed / tb.refillInterval)
+
+	if intervalsPassed <= 0 {
+		return
+	}
+
+	tb.tokens += intervalsPassed * tb.refillAmount
+	if tb.tokens > tb.capacity {
+		tb.tokens = tb.capacity
+	}
+
+	tb.lastRefill = tb.lastRefill.Add(time.Duration(intervalsPassed) * tb.refillInterval)
+}
+
 
 func (tb *TokenBucket) Allow() bool {
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
+
+	tb.refill()
 
 	if tb.tokens == 0 {
 		return false
@@ -87,15 +82,16 @@ func (tb *TokenBucket) Allow() bool {
 }
 
 func (tb *TokenBucket) Tokens() int {
-	tb.mu.RLock()
-	defer tb.mu.RUnlock()
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
 
+	tb.refill()
 	return tb.tokens
 }
 
 func (tb *TokenBucket) LastRefill() time.Time {
-	tb.mu.RLock()
-	defer tb.mu.RUnlock()
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
 
 	return tb.lastRefill
 }
