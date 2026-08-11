@@ -35,52 +35,52 @@ func NewSlidingWindowLog(limit int, window time.Duration) *SlidingWindowLog {
 // cleanUp removes expired timestamps.
 //
 // Caller must hold sw.mu.
-func (swc *SlidingWindowLog) cleanUp() {
+func (swl *SlidingWindowLog) cleanUp() {
 	currentTime := time.Now()
 
-	cutoff := currentTime.Add(-swc.window)
+	cutoff := currentTime.Add(-swl.window)
 
-	for len(swc.requests) > 0 {
-		if swc.requests[0].Before(cutoff) {
-			swc.requests = swc.requests[1:]
+	for len(swl.requests) > 0 {
+		if swl.requests[0].Before(cutoff) {
+			swl.requests = swl.requests[1:]
 		} else {
 			break
 		}
 	}
 }
 
-func (swc *SlidingWindowLog) Allow() bool {
-	swc.mu.Lock()
-	defer swc.mu.Unlock()
+func (swl *SlidingWindowLog) Allow() bool {
+	swl.mu.Lock()
+	defer swl.mu.Unlock()
 
-	swc.cleanUp()
+	swl.cleanUp()
 
-	if len(swc.requests) >= swc.limit {
+	if len(swl.requests) >= swl.limit {
 		return false
 	}
 
-	swc.requests = append(swc.requests, time.Now())
+	swl.requests = append(swl.requests, time.Now())
 	return true
 }
 
 // Requests returns the number of active requests
 // after removing expired timestamps.
-func (swc *SlidingWindowLog) Requests() int {
-	swc.mu.Lock()
-	defer swc.mu.Unlock()
+func (swl *SlidingWindowLog) Requests() int {
+	swl.mu.Lock()
+	defer swl.mu.Unlock()
 
-	swc.cleanUp()
+	swl.cleanUp()
 
-	return len(swc.requests)
+	return len(swl.requests)
 }
 
 // Remaining returns the remaining request capacity
 // in the current sliding window.
-func (swc *SlidingWindowLog) Remaining() int {
-	swc.mu.Lock()
-	defer swc.mu.Unlock()
+func (swl *SlidingWindowLog) Remaining() int {
+	swl.mu.Lock()
+	defer swl.mu.Unlock()
 
-	swc.cleanUp()
+	swl.cleanUp()
 
-	return swc.limit - len(swc.requests)
+	return swl.limit - len(swl.requests)
 }
