@@ -9,7 +9,7 @@ type SlidingWindowLog struct {
 	requests []time.Time
 	limit    int
 	window   time.Duration
-	mu       sync.RWMutex
+	mu       sync.Mutex
 }
 
 // NewSlidingWindowLog creates a sliding window rate limiter.
@@ -65,20 +65,20 @@ func (swc *SlidingWindowLog) Allow() bool {
 
 // Requests returns the number of active requests
 // after removing expired timestamps.
-func (sw *SlidingWindowLog) Requests() int {
-	sw.mu.RLock()
-	defer sw.mu.RUnlock()
+func (swc *SlidingWindowLog) Requests() int {
+	swc.mu.Lock()
+	defer swc.mu.Unlock()
 
-	sw.cleanUp()
+	swc.cleanUp()
 
-	return len(sw.requests)
+	return len(swc.requests)
 }
 
 // Remaining returns the remaining request capacity
 // in the current sliding window.
 func (swc *SlidingWindowLog) Remaining() int {
-	swc.mu.RLock()
-	defer swc.mu.RUnlock()
+	swc.mu.Lock()
+	defer swc.mu.Unlock()
 
 	swc.cleanUp()
 
