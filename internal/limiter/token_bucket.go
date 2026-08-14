@@ -64,18 +64,25 @@ func (tb *TokenBucket) refill() {
 }
 
 func (tb *TokenBucket) Allow() bool {
+	return tb.AllowN(1)
+}
+
+func (tb *TokenBucket) AllowN(amount int) bool {
+	if amount <= 0 {
+		return false
+	}
+
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
 
 	tb.refill()
 
-	if tb.tokens == 0 {
+	if tb.tokens < amount {
 		return false
 	}
 
-	tb.tokens--
+	tb.tokens -= amount
 	return true
-
 }
 
 func (tb *TokenBucket) Tokens() int {

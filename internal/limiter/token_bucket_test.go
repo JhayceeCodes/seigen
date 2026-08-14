@@ -76,3 +76,44 @@ func TestTokenBucketRefill(t *testing.T) {
 	}
 
 }
+
+
+
+
+func TestTokenBucketAllowNConsumesRequestedTokens(t *testing.T) {
+	bucket := limiter.NewTokenBucket(10, time.Second, 1)
+
+	if !bucket.AllowN(4) {
+		t.Fatal("expected request to be allowed")
+	}
+
+	if bucket.Tokens() != 6 {
+		t.Errorf("expected 6 tokens, got %d", bucket.Tokens())
+	}
+}
+
+
+func TestTokenBucketAllowNRejectsWhenInsufficientTokens(t *testing.T) {
+	bucket := limiter.NewTokenBucket(5, time.Second, 1)
+
+	if bucket.AllowN(6) {
+		t.Fatal("expected request to be rejected")
+	}
+
+	if bucket.Tokens() != 5 {
+		t.Errorf("expected tokens to remain unchanged, got %d", bucket.Tokens())
+	}
+}
+
+
+func TestAllowNRejectsInvalidAmount(t *testing.T) {
+	bucket := limiter.NewTokenBucket(5, time.Second, 1)
+
+	if bucket.AllowN(0) {
+		t.Error("expected zero-cost request to be rejected")
+	}
+
+	if bucket.AllowN(-1) {
+		t.Error("expected negative-cost request to be rejected")
+	}
+}
