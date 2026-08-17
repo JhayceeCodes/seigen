@@ -46,7 +46,7 @@ type LeakyBucketConfig struct {
 
 func (LeakyBucketConfig) isLimiterConfig() {}
 
-func (c *LimiterConfig) Validate() error {
+func (c LimiterConfig) Validate() error {
 	switch c.Algorithm {
 	case TokenBucket:
 		config, ok := c.Config.(TokenBucketConfig)
