@@ -2,6 +2,8 @@ package store_test
 
 import (
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -104,8 +106,6 @@ func TestDeleteReturnsNotFound(t *testing.T) {
 	}
 }
 
-
-
 func TestSetRejectsInvalidPolicy(t *testing.T) {
 	policy := model.Policy{
 		Identifier: "user:123",
@@ -125,8 +125,6 @@ func TestSetRejectsInvalidPolicy(t *testing.T) {
 		t.Fatal("expected invalid policy to be rejected")
 	}
 }
-
-
 
 func TestSetReplacesExistingPolicy(t *testing.T) {
 	policyStore := store.NewPolicyStore()
@@ -151,7 +149,7 @@ func TestSetReplacesExistingPolicy(t *testing.T) {
 		Limiter: model.LimiterConfig{
 			Algorithm: model.FixedWindow,
 			Config: model.WindowConfig{
-				Limit: 100,
+				Limit:  100,
 				Window: time.Minute,
 			},
 		},
@@ -171,4 +169,71 @@ func TestSetReplacesExistingPolicy(t *testing.T) {
 	if config.Limit != 100 {
 		t.Errorf("expected updated limit 100, got %d", config.Limit)
 	}
+}
+
+func TestPolicyStoreConcurrentAccess(t *testing.T) {
+	policyStore := store.NewPolicyStore()
+
+	policy := model.Policy{
+		Identifier: "user:123",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.FixedWindow,
+			Config: model.WindowConfig{
+				Limit:  100,
+				Window: time.Minute,
+			},
+		},
+	}
+
+	var wg sync.WaitGroup
+
+	for range 100 {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			if err := policyStore.Set(policy); err != nil {
+				t.Errorf("unexpected Set error: %v", err)
+			}
+
+			_, err := policyStore.Get(policy.Identifier)
+			if err != nil {
+				t.Errorf("unexpected Get error: %v", err)
+			}
+		}()
+	}
+
+	wg.Wait()
+}
+
+func TestPolicyStoreConcurrentWrites(t *testing.T) {
+	policyStore := store.NewPolicyStore()
+
+	var wg sync.WaitGroup
+
+	for i := range 100 {
+		wg.Add(1)
+
+		go func(i int) {
+			defer wg.Done()
+
+			policy := model.Policy{
+				Identifier: model.Identifier(fmt.Sprintf("user:%d", i)),
+				Limiter: model.LimiterConfig{
+					Algorithm: model.FixedWindow,
+					Config: model.WindowConfig{
+						Limit:  100,
+						Window: time.Minute,
+					},
+				},
+			}
+
+			if err := policyStore.Set(policy); err != nil {
+				t.Errorf("unexpected Set error: %v", err)
+			}
+		}(i)
+	}
+
+	wg.Wait()
 }
