@@ -1,0 +1,174 @@
+package store_test
+
+import (
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/JhayceeCodes/seigen/internal/model"
+	"github.com/JhayceeCodes/seigen/internal/store"
+)
+
+func TestNewPolicyStoreStartsEmpty(t *testing.T) {
+	policyStore := store.NewPolicyStore()
+
+	_, err := policyStore.Get("user:123")
+
+	if !errors.Is(err, store.ErrPolicyNotFound) {
+		t.Fatalf("expected ErrPolicyNotFound, got %v", err)
+	}
+}
+
+func TestSetStoresAPolicy(t *testing.T) {
+	policy := model.Policy{
+		Identifier: "user:123",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.TokenBucket,
+			Config: model.TokenBucketConfig{
+				Capacity:       10,
+				RefillInterval: time.Second,
+				RefillAmount:   1,
+			},
+		},
+	}
+
+	policyStore := store.NewPolicyStore()
+
+	if err := policyStore.Set(policy); err != nil {
+		t.Fatalf("expected policy to be stored, got error: %v", err)
+	}
+
+	got, err := policyStore.Get(policy.Identifier)
+	if err != nil {
+		t.Fatalf("expected policy to be retrieved, got error: %v", err)
+	}
+
+	if got.Identifier != policy.Identifier {
+		t.Errorf("expected identifier %q, got %q",
+			policy.Identifier, got.Identifier)
+	}
+
+	if got.Limiter.Algorithm != policy.Limiter.Algorithm {
+		t.Errorf("expected algorithm %q, got %q",
+			policy.Limiter.Algorithm, got.Limiter.Algorithm)
+	}
+}
+
+func TestGetReturnsNotFoundForUnknownIdentifier(t *testing.T) {
+	policyStore := store.NewPolicyStore()
+
+	_, err := policyStore.Get("user:unknown")
+
+	if !errors.Is(err, store.ErrPolicyNotFound) {
+		t.Fatalf("expected ErrPolicyNotFound, got %v", err)
+	}
+}
+
+func TestDeleteRemovesPolicy(t *testing.T) {
+	policy := model.Policy{
+		Identifier: "user:123",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.TokenBucket,
+			Config: model.TokenBucketConfig{
+				Capacity:       10,
+				RefillInterval: time.Second,
+				RefillAmount:   1,
+			},
+		},
+	}
+
+	policyStore := store.NewPolicyStore()
+
+	if err := policyStore.Set(policy); err != nil {
+		t.Fatalf("expected policy to be stored, got error: %v", err)
+	}
+
+	if err := policyStore.Delete(policy.Identifier); err != nil {
+		t.Fatalf("expected policy to be deleted, got error: %v", err)
+	}
+
+	_, err := policyStore.Get(policy.Identifier)
+
+	if !errors.Is(err, store.ErrPolicyNotFound) {
+		t.Fatalf("expected ErrPolicyNotFound, got %v", err)
+	}
+}
+
+func TestDeleteReturnsNotFound(t *testing.T) {
+	policyStore := store.NewPolicyStore()
+
+	err := policyStore.Delete("user:unknown")
+
+	if !errors.Is(err, store.ErrPolicyNotFound) {
+		t.Fatalf("expected ErrPolicyNotFound, got %v", err)
+	}
+}
+
+
+
+func TestSetRejectsInvalidPolicy(t *testing.T) {
+	policy := model.Policy{
+		Identifier: "user:123",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.FixedWindow,
+			Config: model.TokenBucketConfig{
+				Capacity:       10,
+				RefillInterval: time.Second,
+				RefillAmount:   1,
+			},
+		},
+	}
+
+	policyStore := store.NewPolicyStore()
+
+	if err := policyStore.Set(policy); err == nil {
+		t.Fatal("expected invalid policy to be rejected")
+	}
+}
+
+
+
+func TestSetReplacesExistingPolicy(t *testing.T) {
+	policyStore := store.NewPolicyStore()
+
+	policy := model.Policy{
+		Identifier: "user:123",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.FixedWindow,
+			Config: model.WindowConfig{
+				Limit:  10,
+				Window: time.Minute,
+			},
+		},
+	}
+
+	if err := policyStore.Set(policy); err != nil {
+		t.Fatalf("expected policy to be stored, got error: %v", err)
+	}
+
+	updatedPolicy := model.Policy{
+		Identifier: "user:123",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.FixedWindow,
+			Config: model.WindowConfig{
+				Limit: 100,
+				Window: time.Minute,
+			},
+		},
+	}
+
+	if err := policyStore.Set(updatedPolicy); err != nil {
+		t.Fatalf("expected updated policy to be stored, got error: %v", err)
+	}
+
+	got, err := policyStore.Get("user:123")
+	if err != nil {
+		t.Fatalf("expected policy to exist, got error: %v", err)
+	}
+
+	config := got.Limiter.Config.(model.WindowConfig)
+
+	if config.Limit != 100 {
+		t.Errorf("expected updated limit 100, got %d", config.Limit)
+	}
+}
