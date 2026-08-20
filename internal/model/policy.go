@@ -14,3 +14,12 @@ func (p Policy) Validate() error {
 
 	return p.Limiter.Validate()
 }
+
+func (p Policy) Equal(other Policy) bool {
+	return p.Identifier == other.Identifier &&
+		p.Limiter.Equal(other.Limiter)
+}
+
+func (c LimiterConfig) Equal(other LimiterConfig) bool {
+	return c.Algorithm == other.Algorithm && c.Config == other.Config
+}
