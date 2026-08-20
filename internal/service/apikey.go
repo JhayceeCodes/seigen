@@ -17,15 +17,12 @@ func NewAPIKey(tier string) (model.APIKey, error) {
 
 	key := make([]byte, 16)
 
-	_, err := rand.Read((key))
-	if err != nil {
+	if _, err := rand.Read(key); err != nil {
 		return model.APIKey{}, err
 	}
 
-	apiKey := fmt.Sprintf("rlg-%x", key)
-
 	return model.APIKey{
-		Key:  apiKey,
+		Key:  fmt.Sprintf("sgn-%x", key),
 		Tier: apiTier,
 	}, nil
 }
