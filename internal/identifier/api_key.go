@@ -33,5 +33,9 @@ func (r *APIKeyResolver) Resolve(req *http.Request) (model.Identifier, error) {
 		return "", errors.New("api key is required")
 	}
 
+	if strings.ContainsAny(key, " \t\r\n") {
+		return "", errors.New("api key cannot contain whitespace")
+	}
+
 	return model.Identifier(key), nil
 }
