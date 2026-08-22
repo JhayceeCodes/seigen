@@ -45,18 +45,27 @@ func (fw *FixedWindow) maybeReset() {
 	}
 }
 
-func (fw *FixedWindow) Allow() bool {
+func (fw *FixedWindow) Allow() LimiterResult {
 	fw.mu.Lock()
 	defer fw.mu.Unlock()
 
 	fw.maybeReset()
 
-	if fw.requests < fw.limit {
-		fw.requests++
-		return true
+	if fw.requests >= fw.limit {
+		return LimiterResult{
+			Allowed:    false,
+			Remaining:  0,
+			RetryAfter: time.Until(fw.resetTime),
+		}
 	}
 
-	return false
+	fw.requests++
+
+	return LimiterResult{
+		Allowed:    true,
+		Remaining:  fw.limit - fw.requests,
+		RetryAfter: 0,
+	}
 }
 
 func (fw *FixedWindow) Remaining() int {
@@ -64,6 +73,7 @@ func (fw *FixedWindow) Remaining() int {
 	defer fw.mu.Unlock()
 
 	fw.maybeReset()
+
 	return fw.limit - fw.requests
 }
 
@@ -72,5 +82,6 @@ func (fw *FixedWindow) Requests() int {
 	defer fw.mu.Unlock()
 
 	fw.maybeReset()
+
 	return fw.requests
 }

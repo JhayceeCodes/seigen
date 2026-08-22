@@ -34,10 +34,9 @@ func NewSlidingWindowLog(limit int, window time.Duration) *SlidingWindowLog {
 
 // cleanUp removes expired timestamps.
 //
-// Caller must hold sw.mu.
+// Caller must hold swl.mu.
 func (swl *SlidingWindowLog) cleanUp() {
 	currentTime := time.Now()
-
 	cutoff := currentTime.Add(-swl.window)
 
 	for len(swl.requests) > 0 {
@@ -49,18 +48,31 @@ func (swl *SlidingWindowLog) cleanUp() {
 	}
 }
 
-func (swl *SlidingWindowLog) Allow() bool {
+func (swl *SlidingWindowLog) Allow() LimiterResult {
 	swl.mu.Lock()
 	defer swl.mu.Unlock()
 
 	swl.cleanUp()
 
 	if len(swl.requests) >= swl.limit {
-		return false
+		retryAfter := time.Until(
+			swl.requests[0].Add(swl.window),
+		)
+
+		return LimiterResult{
+			Allowed:    false,
+			Remaining:  0,
+			RetryAfter: retryAfter,
+		}
 	}
 
 	swl.requests = append(swl.requests, time.Now())
-	return true
+
+	return LimiterResult{
+		Allowed:    true,
+		Remaining:  swl.limit - len(swl.requests),
+		RetryAfter: 0,
+	}
 }
 
 // Requests returns the number of active requests

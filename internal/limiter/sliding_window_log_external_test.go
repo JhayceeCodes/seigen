@@ -12,8 +12,8 @@ import (
 func TestNewSlidingWindowLogStartsWithZeroRequests(t *testing.T) {
 	window := limiter.NewSlidingWindowLog(5, time.Second)
 
-	if window.Requests() != 0 {
-		t.Fatalf("expected zero requests, got %d", window.Requests())
+	if got := window.Requests(); got != 0 {
+		t.Fatalf("expected zero requests, got %d", got)
 	}
 }
 
@@ -25,8 +25,7 @@ func TestSlidingWindowLogAllowIsConcurrentSafe(t *testing.T) {
 
 	for range 100 {
 		wg.Go(func() {
-
-			if window.Allow() {
+			if window.Allow().Allowed {
 				successful.Add(1)
 			}
 		})
@@ -34,10 +33,9 @@ func TestSlidingWindowLogAllowIsConcurrentSafe(t *testing.T) {
 
 	wg.Wait()
 
-	if successful.Load() != 5 {
-		t.Errorf("expected 5 successful requests, got %d", successful.Load())
+	if got := successful.Load(); got != 5 {
+		t.Errorf("expected 5 successful requests, got %d", got)
 	}
-
 }
 
 func TestSlidingWindowLogStartsFull(t *testing.T) {
@@ -45,11 +43,11 @@ func TestSlidingWindowLogStartsFull(t *testing.T) {
 
 	window := limiter.NewSlidingWindowLog(limit, time.Second)
 
-	if window.Remaining() != limit {
+	if got := window.Remaining(); got != limit {
 		t.Errorf(
 			"expected %d remaining, got %d",
 			limit,
-			window.Remaining(),
+			got,
 		)
 	}
 }
@@ -57,19 +55,30 @@ func TestSlidingWindowLogStartsFull(t *testing.T) {
 func TestSlidingWindowLogAllowRecordsRequests(t *testing.T) {
 	window := limiter.NewSlidingWindowLog(5, time.Second)
 
-	window.Allow()
+	result := window.Allow()
 
-	if window.Requests() != 1 {
-		t.Fatalf(
-			"expected 1 request, got %d",
-			window.Requests(),
+	if !result.Allowed {
+		t.Fatal("expected request to be allowed")
+	}
+
+	if result.Remaining != 4 {
+		t.Errorf(
+			"expected 4 remaining, got %d",
+			result.Remaining,
 		)
 	}
 
-	if window.Remaining() != 4 {
+	if result.RetryAfter != 0 {
+		t.Errorf(
+			"expected no retry delay, got %v",
+			result.RetryAfter,
+		)
+	}
+
+	if got := window.Requests(); got != 1 {
 		t.Fatalf(
-			"expected 4 remaining, got %d",
-			window.Remaining(),
+			"expected 1 request, got %d",
+			got,
 		)
 	}
 }
@@ -80,38 +89,70 @@ func TestSlidingWindowLogLimitIsEnforced(t *testing.T) {
 	window.Allow()
 	window.Allow()
 
-	if window.Allow() {
-		t.Error("expected rejected request")
+	result := window.Allow()
+
+	if result.Allowed {
+		t.Fatal("expected rejected request")
+	}
+
+	if result.Remaining != 0 {
+		t.Errorf(
+			"expected 0 remaining requests, got %d",
+			result.Remaining,
+		)
+	}
+
+	if result.RetryAfter <= 0 {
+		t.Error("expected positive retry delay")
+	}
+
+	if result.RetryAfter > time.Second {
+		t.Errorf(
+			"expected retry delay no greater than %v, got %v",
+			time.Second,
+			result.RetryAfter,
+		)
 	}
 }
 
 func TestSlidingWindowLogExpiredRequestsAreRemoved(t *testing.T) {
-	window := limiter.NewSlidingWindowLog(2, 100*time.Millisecond)
+	window := limiter.NewSlidingWindowLog(
+		2,
+		100*time.Millisecond,
+	)
 
 	window.Allow()
 
 	time.Sleep(150 * time.Millisecond)
 
-	window.Allow()
-	if window.Requests() != 1 {
+	result := window.Allow()
+
+	if !result.Allowed {
+		t.Fatal("expected request to be allowed after expiration")
+	}
+
+	if got := window.Requests(); got != 1 {
 		t.Fatalf(
 			"expected 1 active request after cleanup, got %d",
-			window.Requests(),
+			got,
 		)
 	}
 }
 
 func TestSlidingWindowLogRemainingResetsAfterExpiration(t *testing.T) {
-	window := limiter.NewSlidingWindowLog(2, 100*time.Millisecond)
+	window := limiter.NewSlidingWindowLog(
+		2,
+		100*time.Millisecond,
+	)
 
 	window.Allow()
 
 	time.Sleep(150 * time.Millisecond)
 
-	if window.Remaining() != 2 {
+	if got := window.Remaining(); got != 2 {
 		t.Fatalf(
 			"expected full remaining capacity, got %d",
-			window.Remaining(),
+			got,
 		)
 	}
 }
@@ -123,9 +164,7 @@ func TestNewSlidingWindowLogRejectsInvalidLimit(t *testing.T) {
 		}
 	}()
 
-	window := limiter.NewSlidingWindowLog(-1, time.Second)
-
-	window.Allow()
+	limiter.NewSlidingWindowLog(-1, time.Second)
 }
 
 func TestNewSlidingWindowLogRejectsInvalidWindow(t *testing.T) {
@@ -135,13 +174,14 @@ func TestNewSlidingWindowLogRejectsInvalidWindow(t *testing.T) {
 		}
 	}()
 
-	window := limiter.NewSlidingWindowLog(1, -1*time.Second)
-
-	window.Allow()
+	limiter.NewSlidingWindowLog(1, -1*time.Second)
 }
 
 func TestSlidingWindowLogExpiresOnlyOldRequests(t *testing.T) {
-	window := limiter.NewSlidingWindowLog(2, 100*time.Millisecond)
+	window := limiter.NewSlidingWindowLog(
+		2,
+		100*time.Millisecond,
+	)
 
 	window.Allow()
 
@@ -151,14 +191,57 @@ func TestSlidingWindowLogExpiresOnlyOldRequests(t *testing.T) {
 
 	time.Sleep(60 * time.Millisecond)
 
-	if !window.Allow() {
+	result := window.Allow()
+
+	if !result.Allowed {
 		t.Fatal("expected request to be allowed")
 	}
 
-	if window.Requests() != 2 {
+	if result.Remaining != 0 {
+		t.Errorf(
+			"expected 0 remaining requests, got %d",
+			result.Remaining,
+		)
+	}
+
+	if got := window.Requests(); got != 2 {
 		t.Fatalf(
 			"expected 2 active requests, got %d",
-			window.Requests(),
+			got,
+		)
+	}
+}
+
+func TestSlidingWindowLogRetryAfterTracksOldestRequest(t *testing.T) {
+	window := limiter.NewSlidingWindowLog(
+		2,
+		200*time.Millisecond,
+	)
+
+	window.Allow()
+	window.Allow()
+
+	time.Sleep(50 * time.Millisecond)
+
+	result := window.Allow()
+
+	if result.Allowed {
+		t.Fatal("expected request to be rejected")
+	}
+
+	if result.Remaining != 0 {
+		t.Errorf("expected 0 remaining requests, got %d", result.Remaining)
+	}
+
+	if result.RetryAfter <= 0 {
+		t.Fatal("expected positive retry delay")
+	}
+
+	if result.RetryAfter >= 200*time.Millisecond {
+		t.Errorf(
+			"expected retry delay to be less than %v, got %v",
+			200*time.Millisecond,
+			result.RetryAfter,
 		)
 	}
 }

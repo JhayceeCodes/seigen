@@ -134,7 +134,6 @@ func TestManagerRejectsInvalidConfig(t *testing.T) {
 
 }
 
-
 func TestManagerReplacesLimiterWhenPolicyChanges(t *testing.T) {
 	manager := limiter.NewManager()
 

@@ -12,8 +12,8 @@ import (
 func TestNewSlidingWindowCounterStartsWithZeroRequests(t *testing.T) {
 	counter := limiter.NewSlidingWindowCounter(5, time.Second)
 
-	if counter.Requests() != 0 {
-		t.Fatalf("expected zero requests, got %d", counter.Requests())
+	if got := counter.Requests(); got != 0 {
+		t.Fatalf("expected zero requests, got %d", got)
 	}
 }
 
@@ -22,22 +22,30 @@ func TestSlidingWindowCounterStartsFull(t *testing.T) {
 
 	counter := limiter.NewSlidingWindowCounter(limit, time.Second)
 
-	if counter.Remaining() != limit {
-		t.Errorf("expected %d remaining, got %d", limit, counter.Remaining())
+	if got := counter.Remaining(); got != limit {
+		t.Errorf("expected %d remaining, got %d", limit, got)
 	}
 }
 
 func TestSlidingWindowCounterAllowRecordsRequests(t *testing.T) {
 	counter := limiter.NewSlidingWindowCounter(5, time.Second)
 
-	counter.Allow()
+	result := counter.Allow()
 
-	if counter.Requests() != 1 {
-		t.Fatalf("expected 1 request, got %d", counter.Requests())
+	if !result.Allowed {
+		t.Fatal("expected request to be allowed")
 	}
 
-	if counter.Remaining() != 4 {
-		t.Fatalf("expected 4 remaining, got %d", counter.Remaining())
+	if result.Remaining != 4 {
+		t.Fatalf("expected 4 remaining, got %d", result.Remaining)
+	}
+
+	if result.RetryAfter != 0 {
+		t.Fatalf("expected no retry delay, got %v", result.RetryAfter)
+	}
+
+	if got := counter.Requests(); got != 1 {
+		t.Fatalf("expected 1 request, got %d", got)
 	}
 }
 
@@ -47,8 +55,26 @@ func TestSlidingWindowCounterLimitIsEnforcedWithinWindow(t *testing.T) {
 	counter.Allow()
 	counter.Allow()
 
-	if counter.Allow() {
-		t.Error("expected rejected request")
+	result := counter.Allow()
+
+	if result.Allowed {
+		t.Fatal("expected rejected request")
+	}
+
+	if result.Remaining != 0 {
+		t.Errorf("expected 0 remaining, got %d", result.Remaining)
+	}
+
+	if result.RetryAfter <= 0 {
+		t.Error("expected positive retry delay")
+	}
+
+	if result.RetryAfter > time.Second {
+		t.Errorf(
+			"expected retry delay no greater than %v, got %v",
+			time.Second,
+			result.RetryAfter,
+		)
 	}
 }
 
@@ -60,7 +86,7 @@ func TestSlidingWindowCounterAllowIsConcurrentSafe(t *testing.T) {
 
 	for range 100 {
 		wg.Go(func() {
-			if counter.Allow() {
+			if counter.Allow().Allowed {
 				successful.Add(1)
 			}
 		})
@@ -68,8 +94,8 @@ func TestSlidingWindowCounterAllowIsConcurrentSafe(t *testing.T) {
 
 	wg.Wait()
 
-	if successful.Load() != 5 {
-		t.Errorf("expected 5 successful requests, got %d", successful.Load())
+	if got := successful.Load(); got != 5 {
+		t.Errorf("expected 5 successful requests, got %d", got)
 	}
 }
 
@@ -128,9 +154,7 @@ func TestNewSlidingWindowCounterRejectsInvalidLimit(t *testing.T) {
 		}
 	}()
 
-	counter := limiter.NewSlidingWindowCounter(-1, time.Second)
-
-	counter.Allow()
+	limiter.NewSlidingWindowCounter(-1, time.Second)
 }
 
 func TestNewSlidingWindowCounterRejectsInvalidWindow(t *testing.T) {
@@ -140,9 +164,7 @@ func TestNewSlidingWindowCounterRejectsInvalidWindow(t *testing.T) {
 		}
 	}()
 
-	counter := limiter.NewSlidingWindowCounter(1, -1*time.Second)
-
-	counter.Allow()
+	limiter.NewSlidingWindowCounter(1, -1*time.Second)
 }
 
 func TestSlidingWindowCounterConcurrentReadsAndWritesAreRaceFree(t *testing.T) {
@@ -163,4 +185,30 @@ func TestSlidingWindowCounterConcurrentReadsAndWritesAreRaceFree(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func TestSlidingWindowCounterReturnsRetryAfter(t *testing.T) {
+	window := 200 * time.Millisecond
+	counter := limiter.NewSlidingWindowCounter(2, window)
+
+	counter.Allow()
+	counter.Allow()
+
+	result := counter.Allow()
+
+	if result.Allowed {
+		t.Fatal("expected request to be rejected")
+	}
+
+	if result.RetryAfter <= 0 {
+		t.Fatal("expected positive retry delay")
+	}
+
+	if result.RetryAfter > window {
+		t.Errorf(
+			"expected retry delay no greater than %v, got %v",
+			window,
+			result.RetryAfter,
+		)
+	}
 }

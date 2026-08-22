@@ -15,12 +15,12 @@ func TestNewLeakyBucketStartsEmpty(t *testing.T) {
 		5*time.Second,
 	)
 
-	if bucket.Requests() != 0 {
-		t.Errorf("expected 0 requests, got %d", bucket.Requests())
+	if got := bucket.Requests(); got != 0 {
+		t.Errorf("expected 0 requests, got %d", got)
 	}
 
-	if bucket.Remaining() != 10 {
-		t.Errorf("expected 10 remaining requests, got %d", bucket.Remaining())
+	if got := bucket.Remaining(); got != 10 {
+		t.Errorf("expected 10 remaining requests, got %d", got)
 	}
 }
 
@@ -30,28 +30,50 @@ func TestAllowAddsRequest(t *testing.T) {
 		5*time.Second,
 	)
 
-	bucket.Allow()
+	result := bucket.Allow()
 
-	if bucket.Requests() != 1 {
-		t.Errorf("expected 1 request, got %d", bucket.Requests())
+	if !result.Allowed {
+		t.Fatal("expected request to be allowed")
 	}
 
-	if bucket.Remaining() != 9 {
-		t.Errorf("expected 9 remaining requests, got %d", bucket.Remaining())
+	if result.Remaining != 9 {
+		t.Errorf("expected 9 remaining requests, got %d", result.Remaining)
+	}
+
+	if result.RetryAfter != 0 {
+		t.Errorf("expected no retry delay, got %v", result.RetryAfter)
+	}
+
+	if got := bucket.Requests(); got != 1 {
+		t.Errorf("expected 1 request, got %d", got)
 	}
 }
 
 func TestCapacityIsEnforced(t *testing.T) {
 	bucket := limiter.NewLeakyBucket(
 		2,
-		5*time.Second,
+		500*time.Millisecond,
 	)
 
 	bucket.Allow()
 	bucket.Allow()
 
-	if bucket.Allow() {
-		t.Error("expected rejected request")
+	result := bucket.Allow()
+
+	if result.Allowed {
+		t.Fatal("expected request to be rejected")
+	}
+
+	if result.Remaining != 0 {
+		t.Errorf("expected 0 remaining requests, got %d", result.Remaining)
+	}
+
+	if result.RetryAfter != 500*time.Millisecond {
+		t.Errorf(
+			"expected retry after %v, got %v",
+			5*time.Millisecond,
+			result.RetryAfter,
+		)
 	}
 }
 
@@ -61,16 +83,18 @@ func TestLeakRemovesOneRequest(t *testing.T) {
 		time.Second,
 	)
 
-	bucket.Allow()
-	bucket.Allow()
-	bucket.Allow()
-	bucket.Allow()
-	bucket.Allow()
+	for range 5 {
+		bucket.Allow()
+	}
 
 	time.Sleep(1100 * time.Millisecond)
 
-	if bucket.Requests() != 4 {
-		t.Errorf("expected 4 requests left, got %d", bucket.Requests())
+	if got := bucket.Requests(); got != 4 {
+		t.Errorf("expected 4 requests left, got %d", got)
+	}
+
+	if got := bucket.Remaining(); got != 1 {
+		t.Errorf("expected 1 remaining request, got %d", got)
 	}
 }
 
@@ -80,16 +104,18 @@ func TestMultipleLeaks(t *testing.T) {
 		time.Second,
 	)
 
-	bucket.Allow()
-	bucket.Allow()
-	bucket.Allow()
-	bucket.Allow()
-	bucket.Allow()
+	for range 5 {
+		bucket.Allow()
+	}
 
 	time.Sleep(3300 * time.Millisecond)
 
-	if bucket.Requests() != 2 {
-		t.Errorf("expected 2 requests left, got %d", bucket.Requests())
+	if got := bucket.Requests(); got != 2 {
+		t.Errorf("expected 2 requests left, got %d", got)
+	}
+
+	if got := bucket.Remaining(); got != 3 {
+		t.Errorf("expected 3 remaining requests, got %d", got)
 	}
 }
 
@@ -101,7 +127,6 @@ func TestNewLeakyBucketRejectsInvalidLimit(t *testing.T) {
 	}()
 
 	limiter.NewLeakyBucket(-1, time.Second)
-
 }
 
 func TestNewLeakyBucketRejectsInvalidWindow(t *testing.T) {
@@ -115,32 +140,53 @@ func TestNewLeakyBucketRejectsInvalidWindow(t *testing.T) {
 }
 
 func TestCanAllowAfterLeak(t *testing.T) {
-	bucket := limiter.NewLeakyBucket(2, 100*time.Millisecond)
+	bucket := limiter.NewLeakyBucket(
+		2,
+		100*time.Millisecond,
+	)
 
 	bucket.Allow()
 	bucket.Allow()
 
-	if bucket.Allow() {
+	result := bucket.Allow()
+
+	if result.Allowed {
 		t.Fatal("expected rejection")
+	}
+
+	if result.RetryAfter != 100*time.Millisecond {
+		t.Errorf(
+			"expected retry after %v, got %v",
+			100*time.Millisecond,
+			result.RetryAfter,
+		)
 	}
 
 	time.Sleep(150 * time.Millisecond)
 
-	if !bucket.Allow() {
+	result = bucket.Allow()
+
+	if !result.Allowed {
 		t.Fatal("expected request after leak")
+	}
+
+	if result.Remaining != 0 {
+		t.Errorf("expected 0 remaining requests, got %d", result.Remaining)
 	}
 }
 
 func TestLeakyBucketAllowIsConcurrentSafe(t *testing.T) {
-	bucket := limiter.NewLeakyBucket(5, 100*time.Millisecond)
+	bucket := limiter.NewLeakyBucket(
+		5,
+		100*time.Millisecond,
+	)
 
 	var successful atomic.Int32
 	var wg sync.WaitGroup
 
 	for range 100 {
 		wg.Go(func() {
-
-			if bucket.Allow() {
+			if bucket.Allow().Allowed {
 				successful.Add(1)
 			}
 		})
@@ -148,28 +194,31 @@ func TestLeakyBucketAllowIsConcurrentSafe(t *testing.T) {
 
 	wg.Wait()
 
-	if successful.Load() != 5 {
-		t.Errorf("expected 5 successful requests, got %d", successful.Load())
+	if got := successful.Load(); got != 5 {
+		t.Errorf("expected 5 successful requests, got %d", got)
 	}
 }
 
 func TestRemainingUpdatesAfterLeak(t *testing.T) {
-	bucket := limiter.NewLeakyBucket(2, 100*time.Millisecond)
+	bucket := limiter.NewLeakyBucket(
+		2,
+		100*time.Millisecond,
+	)
 
 	bucket.Allow()
 	bucket.Allow()
 
-	if bucket.Remaining() != 0 {
-		t.Errorf("expected zero remaining requests, got %d", bucket.Remaining())
+	if got := bucket.Remaining(); got != 0 {
+		t.Errorf("expected 0 remaining requests, got %d", got)
 	}
 
 	time.Sleep(150 * time.Millisecond)
 
-	if bucket.Remaining() != 1 {
-		t.Errorf("expected one remaining request, got %d", bucket.Remaining())
+	if got := bucket.Remaining(); got != 1 {
+		t.Errorf("expected 1 remaining request, got %d", got)
 	}
 
-	if bucket.Requests() != 1 {
-		t.Errorf("expected one allowed request, got %d", bucket.Requests())
+	if got := bucket.Requests(); got != 1 {
+		t.Errorf("expected 1 active request, got %d", got)
 	}
 }

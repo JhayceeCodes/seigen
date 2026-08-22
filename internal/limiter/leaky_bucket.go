@@ -54,22 +54,32 @@ func (lb *LeakyBucket) leak() {
 		lb.queue = lb.queue[leaked:]
 	}
 
-	lb.lastLeak = lb.lastLeak.Add(time.Duration(leaked) * lb.leakInterval)
+	lb.lastLeak = lb.lastLeak.Add(
+		time.Duration(leaked) * lb.leakInterval,
+	)
 }
 
-
-func (lb *LeakyBucket) Allow() bool {
+func (lb *LeakyBucket) Allow() LimiterResult {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
 
 	lb.leak()
 
 	if len(lb.queue) >= lb.capacity {
-		return false
+		return LimiterResult{
+			Allowed:    false,
+			Remaining:  0,
+			RetryAfter: lb.leakInterval,
+		}
 	}
 
 	lb.queue = append(lb.queue, time.Now())
-	return true
+
+	return LimiterResult{
+		Allowed:    true,
+		Remaining:  lb.capacity - len(lb.queue),
+		RetryAfter: 0,
+	}
 }
 
 // Requests returns the number of active (unleaked) requests in the bucket.
@@ -78,6 +88,7 @@ func (lb *LeakyBucket) Requests() int {
 	defer lb.mu.Unlock()
 
 	lb.leak()
+
 	return len(lb.queue)
 }
 
@@ -87,5 +98,6 @@ func (lb *LeakyBucket) Remaining() int {
 	defer lb.mu.Unlock()
 
 	lb.leak()
+
 	return lb.capacity - len(lb.queue)
 }

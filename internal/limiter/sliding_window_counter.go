@@ -60,19 +60,35 @@ func (swc *SlidingWindowCounter) weightedCount() float64 {
 	return float64(swc.previousCount)*overlap + float64(swc.currentCount)
 }
 
-func (swc *SlidingWindowCounter) Allow() bool {
+func (swc *SlidingWindowCounter) Allow() LimiterResult {
 	swc.mu.Lock()
 	defer swc.mu.Unlock()
 
 	swc.advance()
 
-	if swc.weightedCount() >= float64(swc.limit) {
-		return false
+	weighted := swc.weightedCount()
+
+	if weighted >= float64(swc.limit) {
+		remaining := int(float64(swc.limit) - weighted)
+		if remaining < 0 {
+			remaining = 0
+		}
+
+		return LimiterResult{
+			Allowed:    false,
+			Remaining:  remaining,
+			RetryAfter: swc.retryAfter(),
+		}
 	}
 
 	swc.currentCount++
+	remaining := int(float64(swc.limit) - swc.weightedCount())
 
-	return true
+	return LimiterResult{
+		Allowed:    true,
+		Remaining:  remaining,
+		RetryAfter: 0,
+	}
 }
 
 // Requests returns the estimated number of active requests
@@ -100,4 +116,43 @@ func (swc *SlidingWindowCounter) Remaining() int {
 	}
 
 	return int(remaining)
+}
+
+func (swc *SlidingWindowCounter) retryAfter() time.Duration {
+	elapsed := time.Since(swc.currentStart)
+
+	if swc.previousCount == 0 {
+		return swc.timeUntilWindowReset()
+	}
+
+	targetOverlap :=
+		float64(swc.limit-swc.currentCount) /
+			float64(swc.previousCount)
+
+	if targetOverlap <= 0 {
+		return swc.timeUntilWindowReset()
+	}
+
+	currentOverlap :=
+		float64(swc.window-elapsed) /
+			float64(swc.window)
+
+	if currentOverlap <= targetOverlap {
+		return 0
+	}
+
+	wait := (currentOverlap - targetOverlap) *
+		float64(swc.window)
+
+	return time.Duration(wait)
+}
+
+func (swc *SlidingWindowCounter) timeUntilWindowReset() time.Duration {
+	remaining := swc.window - time.Since(swc.currentStart)
+
+	if remaining < 0 {
+		return 0
+	}
+
+	return remaining
 }

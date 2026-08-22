@@ -56,20 +56,25 @@ func (tb *TokenBucket) refill() {
 	}
 
 	tb.tokens += intervalsPassed * tb.refillAmount
+
 	if tb.tokens > tb.capacity {
 		tb.tokens = tb.capacity
 	}
 
-	tb.lastRefill = tb.lastRefill.Add(time.Duration(intervalsPassed) * tb.refillInterval)
+	tb.lastRefill = tb.lastRefill.Add(
+		time.Duration(intervalsPassed) * tb.refillInterval,
+	)
 }
 
-func (tb *TokenBucket) Allow() bool {
+func (tb *TokenBucket) Allow() LimiterResult {
 	return tb.AllowN(1)
 }
 
-func (tb *TokenBucket) AllowN(amount int) bool {
+func (tb *TokenBucket) AllowN(amount int) LimiterResult {
 	if amount <= 0 {
-		return false
+		return LimiterResult{
+			Allowed: false,
+		}
 	}
 
 	tb.mu.Lock()
@@ -78,18 +83,28 @@ func (tb *TokenBucket) AllowN(amount int) bool {
 	tb.refill()
 
 	if tb.tokens < amount {
-		return false
+		return LimiterResult{
+			Allowed:    false,
+			Remaining:  tb.tokens,
+			RetryAfter: tb.retryAfter(amount),
+		}
 	}
 
 	tb.tokens -= amount
-	return true
+
+	return LimiterResult{
+		Allowed:    true,
+		Remaining:  tb.tokens,
+		RetryAfter: 0,
+	}
 }
 
-func (tb *TokenBucket) Tokens() int {
+func (tb *TokenBucket) Remaining() int {
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
 
 	tb.refill()
+
 	return tb.tokens
 }
 
@@ -98,4 +113,16 @@ func (tb *TokenBucket) LastRefill() time.Time {
 	defer tb.mu.Unlock()
 
 	return tb.lastRefill
+}
+
+func (tb *TokenBucket) retryAfter(amount int) time.Duration {
+	if amount <= tb.tokens {
+		return 0
+	}
+
+	tokensNeeded := amount - tb.tokens
+
+	intervalsNeeded := (tokensNeeded + tb.refillAmount - 1) / tb.refillAmount
+
+	return time.Duration(intervalsNeeded) * tb.refillInterval
 }
