@@ -1,6 +1,7 @@
 package service_test
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -64,13 +65,22 @@ func TestEvaluateAllowsValidRequest(t *testing.T) {
 
 	rateLimiter, req := newTestRateLimitService(t, policy)
 
-	allowed, err := rateLimiter.Evaluate(req)
+	result, err := rateLimiter.Evaluate(req)
+
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if !allowed {
+	if !result.Allowed {
 		t.Fatal("expected request to be allowed")
+	}
+
+	if result.Remaining != 1 {
+		t.Fatalf("expected 1 remaining, got %d", result.Remaining)
+	}
+
+	if result.RetryAfter != 0 {
+		t.Fatalf("expected no retry delay, got %v", result.RetryAfter)
 	}
 }
 
@@ -89,28 +99,54 @@ func TestEvaluateEnforcesRateLimit(t *testing.T) {
 
 	rateLimiter, req := newTestRateLimitService(t, policy)
 
-	// The bucket starts with two tokens, so the first two requests succeed.
+	expectedRemaining := 1
+
 	for i := range 2 {
-		allowed, err := rateLimiter.Evaluate(req)
+		result, err := rateLimiter.Evaluate(req)
 
 		if err != nil {
 			t.Fatalf("request %d: unexpected error: %v", i+1, err)
 		}
 
-		if !allowed {
-			t.Fatalf("request %d: expected request to be allowed", i+1)
+		if !result.Allowed {
+			t.Fatalf(
+				"request %d: expected request to be allowed",
+				i+1,
+			)
 		}
+
+		if result.Remaining != expectedRemaining {
+			t.Fatalf(
+				"request %d: expected %d remaining, got %d",
+				i+1,
+				expectedRemaining,
+				result.Remaining,
+			)
+		}
+
+		expectedRemaining--
 	}
 
-	// The bucket is now empty.
-	allowed, err := rateLimiter.Evaluate(req)
+	
+	result, err := rateLimiter.Evaluate(req)
 
 	if err != nil {
 		t.Fatalf("third request: unexpected error: %v", err)
 	}
 
-	if allowed {
+	if result.Allowed {
 		t.Fatal("expected third request to be rate limited")
+	}
+
+	if result.Remaining != 0 {
+		t.Fatalf("expected 0 remaining, got %d", result.Remaining)
+	}
+
+	if result.RetryAfter <= 0 {
+		t.Fatalf(
+			"expected positive retry delay, got %v",
+			result.RetryAfter,
+		)
 	}
 }
 
@@ -129,16 +165,18 @@ func TestEvaluateEnforcesRefillLogic(t *testing.T) {
 
 	rateLimiter, req := newTestRateLimitService(t, policy)
 
-	// Consume three of the five available tokens.
 	for i := range 3 {
-		allowed, err := rateLimiter.Evaluate(req)
+		result, err := rateLimiter.Evaluate(req)
 
 		if err != nil {
 			t.Fatalf("request %d: unexpected error: %v", i+1, err)
 		}
 
-		if !allowed {
-			t.Fatalf("request %d: expected request to be allowed", i+1)
+		if !result.Allowed {
+			t.Fatalf(
+				"request %d: expected request to be allowed",
+				i+1,
+			)
 		}
 	}
 
@@ -147,29 +185,93 @@ func TestEvaluateEnforcesRefillLogic(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// The bucket should now contain five tokens.
+	expectedRemaining := 4
+
 	for i := range 5 {
-		allowed, err := rateLimiter.Evaluate(req)
+		result, err := rateLimiter.Evaluate(req)
 
 		if err != nil {
-			t.Fatalf("refilled request %d: unexpected error: %v", i+1, err)
+			t.Fatalf(
+				"refilled request %d: unexpected error: %v",
+				i+1,
+				err,
+			)
 		}
 
-		if !allowed {
+		if !result.Allowed {
 			t.Fatalf(
 				"refilled request %d: expected request to be allowed",
 				i+1,
 			)
 		}
+
+		if result.Remaining != expectedRemaining {
+			t.Fatalf(
+				"refilled request %d: expected %d remaining, got %d",
+				i+1,
+				expectedRemaining,
+				result.Remaining,
+			)
+		}
+
+		expectedRemaining--
 	}
 
 	// The bucket is empty again.
-	allowed, err := rateLimiter.Evaluate(req)
+	result, err := rateLimiter.Evaluate(req)
 
 	if err != nil {
-		t.Fatalf("request after refill: unexpected error: %v", err)
+		t.Fatalf(
+			"request after refill: unexpected error: %v",
+			err,
+		)
 	}
 
-	if allowed {
+	if result.Allowed {
 		t.Fatal("expected request after refill capacity to be rate limited")
+	}
+
+	if result.Remaining != 0 {
+		t.Fatalf(
+			"expected 0 remaining after refill capacity was exhausted, got %d",
+			result.Remaining,
+		)
+	}
+
+	if result.RetryAfter <= 0 {
+		t.Fatalf(
+			"expected positive retry delay, got %v",
+			result.RetryAfter,
+		)
+	}
+}
+
+func TestEvaluateReturnsPolicyNotFound(t *testing.T) {
+	resolver := &mockResolver{
+		id: "api-key:unknown",
+	}
+
+	policyStore := store.NewPolicyStore()
+	manager := limiter.NewManager()
+
+	rateLimiter := service.NewRateLimitService(
+		resolver,
+		policyStore,
+		manager,
+	)
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/",
+		nil,
+	)
+
+	_, err := rateLimiter.Evaluate(req)
+
+	if !errors.Is(err, store.ErrPolicyNotFound) {
+		t.Fatalf(
+			"expected ErrPolicyNotFound, got %v",
+			err,
+		)
 	}
 }

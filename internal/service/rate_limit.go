@@ -26,19 +26,20 @@ func NewRateLimitService(
 	}
 }
 
-func (r *RateLimitService) Evaluate(req *http.Request) (bool, error) {
+func (r *RateLimitService) Evaluate(req *http.Request) (limiter.LimiterResult, error) {
 	id, err := r.resolver.Resolve(req)
 	if err != nil {
-		return false, err
+		return limiter.LimiterResult{}, err
 	}
+
 	policy, err := r.policyStore.Get(id)
 	if err != nil {
-		return false, err
+		return limiter.LimiterResult{}, err
 	}
 
 	lim, err := r.manager.Get(policy.Identifier, policy.Limiter)
 	if err != nil {
-		return false, err
+		return limiter.LimiterResult{}, err
 	}
 
 	return lim.Allow(), nil
