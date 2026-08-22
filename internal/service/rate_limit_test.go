@@ -71,6 +71,10 @@ func TestEvaluateAllowsValidRequest(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
+	if result.Limit != 2 {
+		t.Fatalf("expected limit 2, got %d", result.Limit)
+	}
+
 	if !result.Allowed {
 		t.Fatal("expected request to be allowed")
 	}
@@ -108,6 +112,14 @@ func TestEvaluateEnforcesRateLimit(t *testing.T) {
 			t.Fatalf("request %d: unexpected error: %v", i+1, err)
 		}
 
+		if result.Limit != 2 {
+			t.Fatalf(
+				"request %d: expected limit 2, got %d",
+				i+1,
+				result.Limit,
+			)
+		}
+
 		if !result.Allowed {
 			t.Fatalf(
 				"request %d: expected request to be allowed",
@@ -127,11 +139,14 @@ func TestEvaluateEnforcesRateLimit(t *testing.T) {
 		expectedRemaining--
 	}
 
-	
 	result, err := rateLimiter.Evaluate(req)
 
 	if err != nil {
 		t.Fatalf("third request: unexpected error: %v", err)
+	}
+
+	if result.Limit != 2 {
+		t.Fatalf("expected limit 2, got %d", result.Limit)
 	}
 
 	if result.Allowed {
@@ -165,6 +180,7 @@ func TestEvaluateEnforcesRefillLogic(t *testing.T) {
 
 	rateLimiter, req := newTestRateLimitService(t, policy)
 
+	// Consume three of the five available tokens.
 	for i := range 3 {
 		result, err := rateLimiter.Evaluate(req)
 
@@ -198,6 +214,14 @@ func TestEvaluateEnforcesRefillLogic(t *testing.T) {
 			)
 		}
 
+		if result.Limit != 5 {
+			t.Fatalf(
+				"refilled request %d: expected limit 5, got %d",
+				i+1,
+				result.Limit,
+			)
+		}
+
 		if !result.Allowed {
 			t.Fatalf(
 				"refilled request %d: expected request to be allowed",
@@ -225,6 +249,10 @@ func TestEvaluateEnforcesRefillLogic(t *testing.T) {
 			"request after refill: unexpected error: %v",
 			err,
 		)
+	}
+
+	if result.Limit != 5 {
+		t.Fatalf("expected limit 5, got %d", result.Limit)
 	}
 
 	if result.Allowed {
