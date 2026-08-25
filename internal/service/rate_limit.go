@@ -11,7 +11,7 @@ import (
 
 type RateLimitService struct {
 	resolver    identifier.IdentifierResolver
-	policyStore *store.PolicyStore
+	policyStore store.PolicyRepository
 	manager     *limiter.Manager
 }
 
@@ -22,7 +22,7 @@ type RateLimitResult struct {
 
 func NewRateLimitService(
 	resolver identifier.IdentifierResolver,
-	policyStore *store.PolicyStore,
+	policyStore store.PolicyRepository,
 	manager *limiter.Manager,
 ) *RateLimitService {
 	return &RateLimitService{
