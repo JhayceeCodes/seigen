@@ -16,8 +16,8 @@ const (
 )
 
 type LimiterConfig struct {
-	Algorithm Algorithm
-	Config    Config
+	Algorithm Algorithm `json:"algorithm"`
+	Config    Config    `json:"comfiguration"`
 }
 
 type Config interface {
@@ -25,24 +25,24 @@ type Config interface {
 }
 
 type WindowConfig struct {
-	Limit  int
-	Window time.Duration
+	Limit  int           `json:"limit"`
+	Window time.Duration `json:"window"`
+}
+
+type TokenBucketConfig struct {
+	Capacity       int           `json:"capacity"`
+	RefillInterval time.Duration `json:"refill_interval"`
+	RefillAmount   int           `json:"refill_amount"`
+}
+
+type LeakyBucketConfig struct {
+	Capacity     int           `json:"capacity"`
+	LeakInterval time.Duration `json:"leak_interval"`
 }
 
 func (WindowConfig) isLimiterConfig() {}
 
-type TokenBucketConfig struct {
-	Capacity       int
-	RefillInterval time.Duration
-	RefillAmount   int
-}
-
 func (TokenBucketConfig) isLimiterConfig() {}
-
-type LeakyBucketConfig struct {
-	Capacity     int
-	LeakInterval time.Duration
-}
 
 func (LeakyBucketConfig) isLimiterConfig() {}
 
