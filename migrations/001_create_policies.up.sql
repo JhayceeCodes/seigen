@@ -1,4 +1,4 @@
-CREATE TABLE policies (
+CREATE TABLE seigen_policies (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     identifier TEXT NOT NULL UNIQUE,
     limiter_config JSONB NOT NULL,

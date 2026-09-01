@@ -27,7 +27,7 @@ func (r *PostgresPolicyRepository) Get(identifier model.Identifier) (model.Polic
 	row := r.db.QueryRow(
 		`
 		SELECT identifier, limiter_config
-		FROM policies
+		FROM seigen_policies
 		WHERE identifier = $1
 		`,
 		identifier,
@@ -70,7 +70,7 @@ func (r *PostgresPolicyRepository) Set(policy model.Policy) error {
 
 	_, err = r.db.Exec(
 		`
-		INSERT INTO policies (identifier, limiter_config)
+		INSERT INTO seigen_policies (identifier, limiter_config)
 		VALUES ($1, $2)
 		ON CONFLICT (identifier)
 		DO UPDATE SET limiter_config = EXCLUDED.limiter_config
@@ -85,7 +85,7 @@ func (r *PostgresPolicyRepository) Set(policy model.Policy) error {
 func (r *PostgresPolicyRepository) Delete(identifier model.Identifier) error {
 	result, err := r.db.Exec(
 		`
-		DELETE FROM policies 
+		DELETE FROM seigen_policies 
 		WHERE identifier = $1
 		`,
 		identifier,
