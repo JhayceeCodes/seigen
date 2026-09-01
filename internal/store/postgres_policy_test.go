@@ -1,36 +1,27 @@
 package store_test
 
 import (
-	"os"
+	"regexp"
 	"testing"
 	"time"
 
-	"github.com/JhayceeCodes/seigen/internal/database"
+	"github.com/DATA-DOG/go-sqlmock"
+
 	"github.com/JhayceeCodes/seigen/internal/model"
 	"github.com/JhayceeCodes/seigen/internal/store"
-	"github.com/joho/godotenv"
 )
 
 func TestPostgresPolicyRepository_SetAndGet(t *testing.T) {
-	if err := godotenv.Load("../../.env"); err != nil {
-		t.Fatalf("failed to load .env: %v", err)
-	}
-
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		t.Fatal("DATABASE_URL is not set")
-	}
-
-	db, err := database.NewPostgres(dsn)
+	db, mock, err := sqlmock.New()
 	if err != nil {
-		t.Fatalf("failed to connect to database: %v", err)
+		t.Fatalf("failed to create mock db: %v", err)
 	}
 	defer db.Close()
 
 	repository := store.NewPostgresPolicyRepository(db)
 
 	policy := model.Policy{
-		Identifier: "integration-test-key",
+		Identifier: "test-key",
 		Limiter: model.LimiterConfig{
 			Algorithm: model.TokenBucket,
 			Config: model.TokenBucketConfig{
@@ -41,9 +32,45 @@ func TestPostgresPolicyRepository_SetAndGet(t *testing.T) {
 		},
 	}
 
+	// We expect Set() to execute an INSERT.
+	mock.ExpectExec(regexp.QuoteMeta(`
+		INSERT INTO seigen_policies (identifier, limiter_config)
+		VALUES ($1, $2)
+		ON CONFLICT (identifier)
+		DO UPDATE SET limiter_config = EXCLUDED.limiter_config
+	`)).
+		WithArgs(policy.Identifier, sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
 	if err := repository.Set(policy); err != nil {
-		t.Fatalf("failed to set policy %v", err)
+		t.Fatalf("failed to set policy: %v", err)
 	}
+
+	// We expect Get() to execute a SELECT.
+	configJSON := []byte(`{
+		"algorithm": "token_bucket",
+		"configuration": {
+			"capacity": 5,
+			"refill_interval": 1000000000,
+			"refill_amount": 1
+		}
+	}`)
+
+	rows := sqlmock.NewRows([]string{
+		"identifier",
+		"limiter_config",
+	}).AddRow(
+		policy.Identifier,
+		configJSON,
+	)
+
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT identifier, limiter_config
+		FROM seigen_policies
+		WHERE identifier = $1
+	`)).
+		WithArgs(policy.Identifier).
+		WillReturnRows(rows)
 
 	got, err := repository.Get(policy.Identifier)
 	if err != nil {
@@ -98,5 +125,10 @@ func TestPostgresPolicyRepository_SetAndGet(t *testing.T) {
 			expectedConfig.RefillAmount,
 			config.RefillAmount,
 		)
+	}
+
+	// Make sure every expectation was actually satisfied.
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet database expectations: %v", err)
 	}
 }
