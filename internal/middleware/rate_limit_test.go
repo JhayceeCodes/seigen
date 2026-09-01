@@ -29,7 +29,7 @@ func newTestRateLimitService(
 ) *service.RateLimitService {
 	t.Helper()
 
-	policyStore := store.NewPolicyStore()
+	policyStore := store.NewInMemoryPolicyRepository()
 
 	if err := policyStore.Set(policy); err != nil {
 		t.Fatalf("unexpected error setting policy: %v", err)
@@ -146,7 +146,7 @@ func TestRateLimitIncludesCorrectRemainingValue(t *testing.T) {
 }
 
 func TestRateLimitReturnsPolicyNotConfigured(t *testing.T) {
-	policyStore := store.NewPolicyStore()
+	policyStore := store.NewInMemoryPolicyRepository()
 	manager := limiter.NewManager()
 
 	resolver := &mockResolver{
@@ -260,7 +260,7 @@ func TestRateLimitRejectsRateLimitedRequest(t *testing.T) {
 }
 
 func TestRateLimitReturnsInternalServerErrorForUnexpectedError(t *testing.T) {
-	policyStore := store.NewPolicyStore()
+	policyStore := store.NewInMemoryPolicyRepository()
 	manager := limiter.NewManager()
 
 	resolver := &mockResolver{

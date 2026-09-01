@@ -11,8 +11,8 @@ import (
 	"github.com/JhayceeCodes/seigen/internal/store"
 )
 
-func TestNewPolicyStoreStartsEmpty(t *testing.T) {
-	policyStore := store.NewPolicyStore()
+func TestNewInMemoryPolicyRepositoryStartsEmpty(t *testing.T) {
+	policyStore := store.NewInMemoryPolicyRepository()
 
 	_, err := policyStore.Get("user:123")
 
@@ -34,7 +34,7 @@ func TestSetStoresAPolicy(t *testing.T) {
 		},
 	}
 
-	policyStore := store.NewPolicyStore()
+	policyStore := store.NewInMemoryPolicyRepository()
 
 	if err := policyStore.Set(policy); err != nil {
 		t.Fatalf("expected policy to be stored, got error: %v", err)
@@ -57,7 +57,7 @@ func TestSetStoresAPolicy(t *testing.T) {
 }
 
 func TestGetReturnsNotFoundForUnknownIdentifier(t *testing.T) {
-	policyStore := store.NewPolicyStore()
+	policyStore := store.NewInMemoryPolicyRepository()
 
 	_, err := policyStore.Get("user:unknown")
 
@@ -79,7 +79,7 @@ func TestDeleteRemovesPolicy(t *testing.T) {
 		},
 	}
 
-	policyStore := store.NewPolicyStore()
+	policyStore := store.NewInMemoryPolicyRepository()
 
 	if err := policyStore.Set(policy); err != nil {
 		t.Fatalf("expected policy to be stored, got error: %v", err)
@@ -97,7 +97,7 @@ func TestDeleteRemovesPolicy(t *testing.T) {
 }
 
 func TestDeleteReturnsNotFound(t *testing.T) {
-	policyStore := store.NewPolicyStore()
+	policyStore := store.NewInMemoryPolicyRepository()
 
 	err := policyStore.Delete("user:unknown")
 
@@ -119,7 +119,7 @@ func TestSetRejectsInvalidPolicy(t *testing.T) {
 		},
 	}
 
-	policyStore := store.NewPolicyStore()
+	policyStore := store.NewInMemoryPolicyRepository()
 
 	if err := policyStore.Set(policy); err == nil {
 		t.Fatal("expected invalid policy to be rejected")
@@ -127,7 +127,7 @@ func TestSetRejectsInvalidPolicy(t *testing.T) {
 }
 
 func TestSetReplacesExistingPolicy(t *testing.T) {
-	policyStore := store.NewPolicyStore()
+	policyStore := store.NewInMemoryPolicyRepository()
 
 	policy := model.Policy{
 		Identifier: "user:123",
@@ -172,7 +172,7 @@ func TestSetReplacesExistingPolicy(t *testing.T) {
 }
 
 func TestPolicyStoreConcurrentAccess(t *testing.T) {
-	policyStore := store.NewPolicyStore()
+	policyStore := store.NewInMemoryPolicyRepository()
 
 	policy := model.Policy{
 		Identifier: "user:123",
@@ -208,7 +208,7 @@ func TestPolicyStoreConcurrentAccess(t *testing.T) {
 }
 
 func TestPolicyStoreConcurrentWrites(t *testing.T) {
-	policyStore := store.NewPolicyStore()
+	policyStore := store.NewInMemoryPolicyRepository()
 
 	var wg sync.WaitGroup
 

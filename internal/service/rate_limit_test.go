@@ -27,7 +27,7 @@ func newTestRateLimitService(
 ) (*service.RateLimitService, *http.Request) {
 	t.Helper()
 
-	policyStore := store.NewPolicyStore()
+	policyStore := store.NewInMemoryPolicyRepository()
 
 	if err := policyStore.Set(policy); err != nil {
 		t.Fatalf("unexpected error setting policy: %v", err)
@@ -279,7 +279,7 @@ func TestEvaluateReturnsPolicyNotFound(t *testing.T) {
 		id: "api-key:unknown",
 	}
 
-	policyStore := store.NewPolicyStore()
+	policyStore := store.NewInMemoryPolicyRepository()
 	manager := limiter.NewManager()
 
 	rateLimiter := service.NewRateLimitService(
