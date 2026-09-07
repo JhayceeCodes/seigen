@@ -237,3 +237,169 @@ func TestPolicyStoreConcurrentWrites(t *testing.T) {
 
 	wg.Wait()
 }
+
+
+
+func TestNewInMemoryPolicyGroupRepositoryStartsEmpty(t *testing.T) {
+	groupStore := store.NewInMemoryPolicyGroupRepository()
+
+	_, err := groupStore.Get("free")
+
+	if !errors.Is(err, store.ErrPolicyGroupNotFound) {
+		t.Fatalf("expected ErrPolicyGroupNotFound, got %v", err)
+	}
+}
+
+func TestSetStoresAPolicyGroup(t *testing.T) {
+	group := model.PolicyGroup{
+		Name: "free",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.FixedWindow,
+			Config: model.WindowConfig{
+				Limit:  10,
+				Window: time.Minute,
+			},
+		},
+	}
+
+	groupStore := store.NewInMemoryPolicyGroupRepository()
+
+	if err := groupStore.Set(group); err != nil {
+		t.Fatalf("expected policy group to be stored, got error: %v", err)
+	}
+
+	got, err := groupStore.Get(group.Name)
+	if err != nil {
+		t.Fatalf("expected policy group to be retrieved, got error: %v", err)
+	}
+
+	if got.Name != group.Name {
+		t.Errorf("expected group name %q, got %q",
+			group.Name, got.Name)
+	}
+
+	if got.Limiter.Algorithm != group.Limiter.Algorithm {
+		t.Errorf("expected algorithm %q, got %q",
+			group.Limiter.Algorithm, got.Limiter.Algorithm)
+	}
+
+	config := got.Limiter.Config.(model.WindowConfig)
+
+	if config.Limit != 10 {
+		t.Errorf("expected limit 10, got %d", config.Limit)
+	}
+}
+
+func TestGetPolicyGroupReturnsNotFound(t *testing.T) {
+	groupStore := store.NewInMemoryPolicyGroupRepository()
+
+	_, err := groupStore.Get("unknown")
+
+	if !errors.Is(err, store.ErrPolicyGroupNotFound) {
+		t.Fatalf("expected ErrPolicyGroupNotFound, got %v", err)
+	}
+}
+
+func TestDeleteRemovesPolicyGroup(t *testing.T) {
+	group := model.PolicyGroup{
+		Name: "free",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.FixedWindow,
+			Config: model.WindowConfig{
+				Limit:  10,
+				Window: time.Minute,
+			},
+		},
+	}
+
+	groupStore := store.NewInMemoryPolicyGroupRepository()
+
+	if err := groupStore.Set(group); err != nil {
+		t.Fatalf("expected policy group to be stored, got error: %v", err)
+	}
+
+	if err := groupStore.Delete(group.Name); err != nil {
+		t.Fatalf("expected policy group to be deleted, got error: %v", err)
+	}
+
+	_, err := groupStore.Get(group.Name)
+
+	if !errors.Is(err, store.ErrPolicyGroupNotFound) {
+		t.Fatalf("expected ErrPolicyGroupNotFound, got %v", err)
+	}
+}
+
+func TestDeletePolicyGroupReturnsNotFound(t *testing.T) {
+	groupStore := store.NewInMemoryPolicyGroupRepository()
+
+	err := groupStore.Delete("unknown")
+
+	if !errors.Is(err, store.ErrPolicyGroupNotFound) {
+		t.Fatalf("expected ErrPolicyGroupNotFound, got %v", err)
+	}
+}
+
+func TestSetRejectsInvalidPolicyGroup(t *testing.T) {
+	group := model.PolicyGroup{
+		Name: "free",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.FixedWindow,
+			Config: model.TokenBucketConfig{
+				Capacity:       10,
+				RefillInterval: time.Second,
+				RefillAmount:   1,
+			},
+		},
+	}
+
+	groupStore := store.NewInMemoryPolicyGroupRepository()
+
+	if err := groupStore.Set(group); err == nil {
+		t.Fatal("expected invalid policy group to be rejected")
+	}
+}
+
+func TestSetReplacesExistingPolicyGroup(t *testing.T) {
+	groupStore := store.NewInMemoryPolicyGroupRepository()
+
+	group := model.PolicyGroup{
+		Name: "free",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.FixedWindow,
+			Config: model.WindowConfig{
+				Limit:  10,
+				Window: time.Minute,
+			},
+		},
+	}
+
+	if err := groupStore.Set(group); err != nil {
+		t.Fatalf("expected policy group to be stored, got error: %v", err)
+	}
+
+	updatedGroup := model.PolicyGroup{
+		Name: "free",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.FixedWindow,
+			Config: model.WindowConfig{
+				Limit:  100,
+				Window: time.Minute,
+			},
+		},
+	}
+
+	if err := groupStore.Set(updatedGroup); err != nil {
+		t.Fatalf("expected updated policy group to be stored, got error: %v", err)
+	}
+
+	got, err := groupStore.Get("free")
+	if err != nil {
+		t.Fatalf("expected policy group to exist, got error: %v", err)
+	}
+
+	config := got.Limiter.Config.(model.WindowConfig)
+
+	if config.Limit != 100 {
+		t.Errorf("expected updated limit 100, got %d", config.Limit)
+	}
+}

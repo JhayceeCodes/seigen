@@ -1,6 +1,8 @@
 package store_test
 
 import (
+	"database/sql"
+	"errors"
 	"regexp"
 	"testing"
 	"time"
@@ -128,6 +130,178 @@ func TestPostgresPolicyRepository_SetAndGet(t *testing.T) {
 	}
 
 	// Make sure every expectation was actually satisfied.
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet database expectations: %v", err)
+	}
+}
+
+func TestPostgresPolicyRepository_GetReturnsNotFound(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create mock db: %v", err)
+	}
+	defer db.Close()
+
+	repository := store.NewPostgresPolicyRepository(db)
+
+	mock.ExpectQuery(regexp.QuoteMeta(`
+		SELECT identifier, limiter_config
+		FROM seigen_policies
+		WHERE identifier = $1
+	`)).
+		WithArgs(model.Identifier("unknown-key")).
+		WillReturnError(sql.ErrNoRows)
+
+	_, err = repository.Get("unknown-key")
+
+	if !errors.Is(err, store.ErrPolicyNotFound) {
+		t.Fatalf("expected ErrPolicyNotFound, got %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet database expectations: %v", err)
+	}
+}
+
+func TestPostgresPolicyRepository_Delete(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create mock db: %v", err)
+	}
+	defer db.Close()
+
+	repository := store.NewPostgresPolicyRepository(db)
+
+	mock.ExpectExec(regexp.QuoteMeta(`
+		DELETE FROM seigen_policies 
+		WHERE identifier = $1
+	`)).
+		WithArgs(model.Identifier("test-key")).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := repository.Delete("test-key"); err != nil {
+		t.Fatalf("failed to delete policy: %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet database expectations: %v", err)
+	}
+}
+
+func TestPostgresPolicyRepository_DeleteReturnsNotFound(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create mock db: %v", err)
+	}
+	defer db.Close()
+
+	repository := store.NewPostgresPolicyRepository(db)
+
+	mock.ExpectExec(regexp.QuoteMeta(`
+		DELETE FROM seigen_policies 
+		WHERE identifier = $1
+	`)).
+		WithArgs(model.Identifier("unknown-key")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	err = repository.Delete("unknown-key")
+
+	if !errors.Is(err, store.ErrPolicyNotFound) {
+		t.Fatalf("expected ErrPolicyNotFound, got %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet database expectations: %v", err)
+	}
+}
+
+func TestPostgresPolicyRepository_SetRejectsInvalidPolicy(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create mock db: %v", err)
+	}
+	defer db.Close()
+
+	repository := store.NewPostgresPolicyRepository(db)
+
+	policy := model.Policy{
+		Identifier: "test-key",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.FixedWindow,
+			Config: model.TokenBucketConfig{
+				Capacity:       5,
+				RefillInterval: time.Second,
+				RefillAmount:   1,
+			},
+		},
+	}
+
+	if err := repository.Set(policy); err == nil {
+		t.Fatal("expected invalid policy to be rejected")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unexpected database interaction: %v", err)
+	}
+}
+
+func TestPostgresPolicyRepository_SetReplacesExistingPolicy(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create mock db: %v", err)
+	}
+	defer db.Close()
+
+	repository := store.NewPostgresPolicyRepository(db)
+
+	policy := model.Policy{
+		Identifier: "test-key",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.FixedWindow,
+			Config: model.WindowConfig{
+				Limit:  10,
+				Window: time.Minute,
+			},
+		},
+	}
+
+	mock.ExpectExec(regexp.QuoteMeta(`
+		INSERT INTO seigen_policies (identifier, limiter_config)
+		VALUES ($1, $2)
+		ON CONFLICT (identifier)
+		DO UPDATE SET limiter_config = EXCLUDED.limiter_config
+	`)).
+		WithArgs(policy.Identifier, sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	if err := repository.Set(policy); err != nil {
+		t.Fatalf("failed to set initial policy: %v", err)
+	}
+
+	updatedPolicy := model.Policy{
+		Identifier: "test-key",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.FixedWindow,
+			Config: model.WindowConfig{
+				Limit:  100,
+				Window: time.Minute,
+			},
+		},
+	}
+
+	mock.ExpectExec(regexp.QuoteMeta(`
+		INSERT INTO seigen_policies (identifier, limiter_config)
+		VALUES ($1, $2)
+		ON CONFLICT (identifier)
+		DO UPDATE SET limiter_config = EXCLUDED.limiter_config
+	`)).
+		WithArgs(updatedPolicy.Identifier, sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	if err := repository.Set(updatedPolicy); err != nil {
+		t.Fatalf("failed to update policy: %v", err)
+	}
+
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet database expectations: %v", err)
 	}
