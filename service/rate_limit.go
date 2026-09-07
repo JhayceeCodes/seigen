@@ -43,7 +43,7 @@ func (r *RateLimitService) Evaluate(req *http.Request) (RateLimitResult, error) 
 		return RateLimitResult{}, err
 	}
 
-	lim, err := r.manager.Get(policy.Identifier, policy.Limiter)
+	lim, err := r.manager.GetOrCreate(policy.Identifier, policy.Limiter)
 	if err != nil {
 		return RateLimitResult{}, err
 	}

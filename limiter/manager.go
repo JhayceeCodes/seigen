@@ -23,7 +23,7 @@ func NewManager() *Manager {
 }
 
 // Get fetches an existing limiter instance or creates a new one.
-func (m *Manager) Get(
+func (m *Manager) GetOrCreate(
 	identifier model.Identifier,
 	config model.LimiterConfig,
 ) (Limiter, error) {

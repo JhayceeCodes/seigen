@@ -21,12 +21,12 @@ func TestManagerReturnsSameLimiterForIdentifier(t *testing.T) {
 		},
 	}
 
-	first, err := manager.Get("user:123", config)
+	first, err := manager.GetOrCreate("user:123", config)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	second, err := manager.Get("user:123", config)
+	second, err := manager.GetOrCreate("user:123", config)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -48,12 +48,12 @@ func TestManagerCreatesSeparateLimiters(t *testing.T) {
 		},
 	}
 
-	first, err := manager.Get("user:123", config)
+	first, err := manager.GetOrCreate("user:123", config)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	second, err := manager.Get("user:456", config)
+	second, err := manager.GetOrCreate("user:456", config)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestManagerConcurrentAccess(t *testing.T) {
 
 	for range goroutines {
 		wg.Go(func() {
-			got, err := manager.Get("user:123", config)
+			got, err := manager.GetOrCreate("user:123", config)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 				return
@@ -128,7 +128,7 @@ func TestManagerRejectsInvalidConfig(t *testing.T) {
 		},
 	}
 
-	if _, err := manager.Get("user:123", config); err == nil {
+	if _, err := manager.GetOrCreate("user:123", config); err == nil {
 		t.Fatal("expected invalid limiter configuration to be rejected")
 	}
 
@@ -155,12 +155,12 @@ func TestManagerReplacesLimiterWhenPolicyChanges(t *testing.T) {
 		},
 	}
 
-	first, err := manager.Get("user:123", firstConfig)
+	first, err := manager.GetOrCreate("user:123", firstConfig)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	second, err := manager.Get("user:123", secondConfig)
+	second, err := manager.GetOrCreate("user:123", secondConfig)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
