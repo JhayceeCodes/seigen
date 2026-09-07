@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/JhayceeCodes/seigen/model"
@@ -14,7 +15,6 @@ type InMemoryPolicyRepository struct {
 type InMemoryPolicyGroupRepository struct {
 	mu     sync.RWMutex
 	groups map[string]model.PolicyGroup
-	ids    map[int64]string
 }
 
 type InMemoryPolicyGroupMemberRepository struct {
@@ -71,10 +71,9 @@ func (r *InMemoryPolicyRepository) Delete(identifier model.Identifier) error {
 // Policy groups
 
 func NewInMemoryPolicyGroupRepository() *InMemoryPolicyGroupRepository {
-    return &InMemoryPolicyGroupRepository{
-        groups: make(map[string]model.PolicyGroup),
-        ids:    make(map[int64]string),
-    }
+	return &InMemoryPolicyGroupRepository{
+		groups: make(map[string]model.PolicyGroup),
+	}
 }
 
 func (g *InMemoryPolicyGroupRepository) Set(group model.PolicyGroup) error {
@@ -145,7 +144,18 @@ func (r *InMemoryPolicyGroupMemberRepository) AddMember(
 	groupName string,
 	identifier model.Identifier,
 ) error {
-	// validate identifier/group name
+	if groupName == "" {
+		return errors.New("group name cannot be empty")
+	}
+
+	if identifier == "" {
+		return errors.New("identifier cannot be empty")
+	}
+
+	if _, err := r.groups.Get(groupName); err != nil {
+		return err
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
