@@ -7,12 +7,25 @@ type Policy struct {
 	Limiter    LimiterConfig
 }
 
+type PolicyGroup struct {
+	Name    string
+	Limiter LimiterConfig
+}
+
 func (p Policy) Validate() error {
 	if p.Identifier == "" {
 		return errors.New("identifier cannot be empty")
 	}
 
 	return p.Limiter.Validate()
+}
+
+func (g PolicyGroup) Validate() error {
+	if g.Name == "" {
+		return errors.New("group name cannot be empty")
+	}
+
+	return g.Limiter.Validate()
 }
 
 func (p Policy) Equal(other Policy) bool {
