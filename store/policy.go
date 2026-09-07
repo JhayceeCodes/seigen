@@ -17,7 +17,7 @@ type PolicyGroupRepository interface {
 }
 
 type PolicyGroupMemberRepository interface {
-	AddMember(groupID int64, identifier model.Identifier) error
+	AddMember(groupName string, identifier model.Identifier) error
 	RemoveMember(identifier model.Identifier) error
 	GetGroup(identifier model.Identifier) (model.PolicyGroup, error)
 }

@@ -179,15 +179,27 @@ func (g *PostgresPolicyGroupRepository) Get(name string) (model.PolicyGroup, err
 }
 
 func (g *PostgresPolicyGroupRepository) Delete(name string) error {
-	_, err := g.db.Exec(
+	result, err := g.db.Exec(
 		`
 		DELETE FROM seigen_policy_groups
 		WHERE name = $1
 		`,
 		name,
 	)
+	if err != nil {
+		return err
+	}
 
-	return err
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return ErrPolicyGroupNotFound
+	}
+
+	return nil
 }
 
 // Policy group member
@@ -198,42 +210,67 @@ func NewPostgresPolicyGroupMemberRepository(db *sql.DB) *PostgresPolicyGroupMemb
 }
 
 func (r *PostgresPolicyGroupMemberRepository) AddMember(
-	groupID int64,
+	groupName string,
 	identifier model.Identifier,
 ) error {
-	member := model.PolicyGroupMember{
-		GroupID:    groupID,
-		Identifier: identifier,
+	if groupName == "" {
+		return errors.New("group name cannot be empty")
 	}
 
-	if err := member.Validate(); err != nil {
+	if identifier == "" {
+		return errors.New("identifier cannot be empty")
+	}
+
+	result, err := r.db.Exec(
+		`
+		INSERT INTO seigen_policy_group_members (group_id, identifier)
+		SELECT id, $2
+		FROM seigen_policy_groups
+		WHERE name = $1
+		`,
+		groupName,
+		identifier,
+	)
+	if err != nil {
 		return err
 	}
 
-	_, err := r.db.Exec(
-		`
-		INSERT INTO seigen_policy_group_members (group_id, identifier)
-		VALUES ($1, $2)
-		`,
-		member.GroupID,
-		member.Identifier,
-	)
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
 
-	return err
+	if rowsAffected == 0 {
+		return ErrPolicyGroupNotFound
+	}
+
+	return nil
 }
 
 func (r *PostgresPolicyGroupMemberRepository) RemoveMember(
 	identifier model.Identifier,
 ) error {
-	_, err := r.db.Exec(
+	result, err := r.db.Exec(
 		`
 		DELETE FROM seigen_policy_group_members
 		WHERE identifier = $1
 		`,
 		identifier,
 	)
+	if err != nil {
+		return err
+	}
 
-	return err
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return ErrPolicyGroupMemberNotFound
+	}
+
+	return nil
 }
 
 func (r *PostgresPolicyGroupMemberRepository) GetGroup(
@@ -257,7 +294,7 @@ func (r *PostgresPolicyGroupMemberRepository) GetGroup(
 
 	if err := row.Scan(&group.Name, &config); err != nil {
 		if err == sql.ErrNoRows {
-			return model.PolicyGroup{}, ErrPolicyGroupNotFound
+			return model.PolicyGroup{}, ErrPolicyGroupMemberNotFound
 		}
 
 		return model.PolicyGroup{}, err
