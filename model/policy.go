@@ -12,6 +12,11 @@ type PolicyGroup struct {
 	Limiter LimiterConfig
 }
 
+type PolicyGroupMember struct {
+	GroupID    int64
+	Identifier Identifier
+}
+
 func (p Policy) Validate() error {
 	if p.Identifier == "" {
 		return errors.New("identifier cannot be empty")
@@ -26,6 +31,18 @@ func (g PolicyGroup) Validate() error {
 	}
 
 	return g.Limiter.Validate()
+}
+
+func (m PolicyGroupMember) Validate() error {
+    if m.GroupID <= 0 {
+        return errors.New("group ID must be greater than zero")
+    }
+
+    if m.Identifier == "" {
+        return errors.New("identifier cannot be empty")
+    }
+
+    return nil
 }
 
 func (p Policy) Equal(other Policy) bool {
