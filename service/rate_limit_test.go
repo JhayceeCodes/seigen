@@ -42,6 +42,7 @@ func newTestRateLimitService(
 	rateLimiter := service.NewRateLimitService(
 		resolver,
 		policyStore,
+		nil,
 		manager,
 	)
 
@@ -180,7 +181,6 @@ func TestEvaluateEnforcesRefillLogic(t *testing.T) {
 
 	rateLimiter, req := newTestRateLimitService(t, policy)
 
-	// Consume three of the five available tokens.
 	for i := range 3 {
 		result, err := rateLimiter.Evaluate(req)
 
@@ -196,11 +196,8 @@ func TestEvaluateEnforcesRefillLogic(t *testing.T) {
 		}
 	}
 
-	// Two tokens remain. After two seconds, four refill intervals
-	// have passed, but the bucket is capped at its capacity of five.
 	time.Sleep(2 * time.Second)
 
-	// The bucket should now contain five tokens.
 	expectedRemaining := 4
 
 	for i := range 5 {
@@ -241,7 +238,6 @@ func TestEvaluateEnforcesRefillLogic(t *testing.T) {
 		expectedRemaining--
 	}
 
-	// The bucket is empty again.
 	result, err := rateLimiter.Evaluate(req)
 
 	if err != nil {
@@ -285,6 +281,7 @@ func TestEvaluateReturnsPolicyNotFound(t *testing.T) {
 	rateLimiter := service.NewRateLimitService(
 		resolver,
 		policyStore,
+		nil,
 		manager,
 	)
 
@@ -293,6 +290,184 @@ func TestEvaluateReturnsPolicyNotFound(t *testing.T) {
 		"/",
 		nil,
 	)
+
+	_, err := rateLimiter.Evaluate(req)
+
+	if !errors.Is(err, store.ErrPolicyNotFound) {
+		t.Fatalf(
+			"expected ErrPolicyNotFound, got %v",
+			err,
+		)
+	}
+}
+
+func TestEvaluateUsesPolicyGroup(t *testing.T) {
+	identifier := model.Identifier("api-key:123")
+
+	resolver := &mockResolver{
+		id: identifier,
+	}
+
+	policyStore := store.NewInMemoryPolicyRepository()
+
+	groupRepo := store.NewInMemoryPolicyGroupRepository()
+	memberRepo := store.NewInMemoryPolicyGroupMemberRepository(groupRepo)
+
+	group := model.PolicyGroup{
+		Name: "premium",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.TokenBucket,
+			Config: model.TokenBucketConfig{
+				Capacity:       5,
+				RefillInterval: time.Minute,
+				RefillAmount:   5,
+			},
+		},
+	}
+
+	if err := groupRepo.Set(group); err != nil {
+		t.Fatalf("unexpected error setting group: %v", err)
+	}
+
+	if err := memberRepo.AddMember("premium", identifier); err != nil {
+		t.Fatalf("unexpected error adding member: %v", err)
+	}
+
+	manager := limiter.NewManager()
+
+	rateLimiter := service.NewRateLimitService(
+		resolver,
+		policyStore,
+		memberRepo,
+		manager,
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	result, err := rateLimiter.Evaluate(req)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if result.Limit != 5 {
+		t.Fatalf("expected limit 5, got %d", result.Limit)
+	}
+
+	if !result.Allowed {
+		t.Fatal("expected request to be allowed")
+	}
+
+	if result.Remaining != 4 {
+		t.Fatalf("expected 4 remaining, got %d", result.Remaining)
+	}
+}
+
+func TestEvaluateIndividualPolicyTakesPrecedenceOverGroup(t *testing.T) {
+	identifier := model.Identifier("api-key:123")
+
+	resolver := &mockResolver{
+		id: identifier,
+	}
+
+	policyStore := store.NewInMemoryPolicyRepository()
+
+	// Individual policy: limit 2.
+	policy := model.Policy{
+		Identifier: identifier,
+		Limiter: model.LimiterConfig{
+			Algorithm: model.TokenBucket,
+			Config: model.TokenBucketConfig{
+				Capacity:       2,
+				RefillInterval: time.Minute,
+				RefillAmount:   2,
+			},
+		},
+	}
+
+	if err := policyStore.Set(policy); err != nil {
+		t.Fatalf("unexpected error setting policy: %v", err)
+	}
+
+	// Group policy: limit 10.
+	groupRepo := store.NewInMemoryPolicyGroupRepository()
+	memberRepo := store.NewInMemoryPolicyGroupMemberRepository(groupRepo)
+
+	group := model.PolicyGroup{
+		Name: "premium",
+		Limiter: model.LimiterConfig{
+			Algorithm: model.TokenBucket,
+			Config: model.TokenBucketConfig{
+				Capacity:       10,
+				RefillInterval: time.Minute,
+				RefillAmount:   10,
+			},
+		},
+	}
+
+	if err := groupRepo.Set(group); err != nil {
+		t.Fatalf("unexpected error setting group: %v", err)
+	}
+
+	if err := memberRepo.AddMember("premium", identifier); err != nil {
+		t.Fatalf("unexpected error adding member: %v", err)
+	}
+
+	manager := limiter.NewManager()
+
+	rateLimiter := service.NewRateLimitService(
+		resolver,
+		policyStore,
+		memberRepo,
+		manager,
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	result, err := rateLimiter.Evaluate(req)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// The individual policy should win.
+	if result.Limit != 2 {
+		t.Fatalf(
+			"expected individual policy limit 2, got %d",
+			result.Limit,
+		)
+	}
+
+	if !result.Allowed {
+		t.Fatal("expected request to be allowed")
+	}
+
+	if result.Remaining != 1 {
+		t.Fatalf(
+			"expected 1 remaining, got %d",
+			result.Remaining,
+		)
+	}
+}
+
+func TestEvaluateReturnsPolicyNotFoundWithoutGroupStore(t *testing.T) {
+	identifier := model.Identifier("api-key:unknown")
+
+	resolver := &mockResolver{
+		id: identifier,
+	}
+
+	policyStore := store.NewInMemoryPolicyRepository()
+	manager := limiter.NewManager()
+
+	rateLimiter := service.NewRateLimitService(
+		resolver,
+		policyStore,
+		nil,
+		manager,
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
 	_, err := rateLimiter.Evaluate(req)
 

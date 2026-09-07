@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/JhayceeCodes/seigen/identifier"
@@ -10,9 +11,10 @@ import (
 )
 
 type RateLimitService struct {
-	resolver    identifier.IdentifierResolver
-	policyStore store.PolicyRepository
-	manager     *limiter.Manager
+	resolver         identifier.IdentifierResolver
+	policyStore      store.PolicyRepository
+	groupMemberStore store.PolicyGroupMemberRepository
+	manager          *limiter.Manager
 }
 
 type RateLimitResult struct {
@@ -23,12 +25,14 @@ type RateLimitResult struct {
 func NewRateLimitService(
 	resolver identifier.IdentifierResolver,
 	policyStore store.PolicyRepository,
+	groupMemberStore store.PolicyGroupMemberRepository,
 	manager *limiter.Manager,
 ) *RateLimitService {
 	return &RateLimitService{
-		resolver:    resolver,
-		policyStore: policyStore,
-		manager:     manager,
+		resolver:         resolver,
+		policyStore:      policyStore,
+		groupMemberStore: groupMemberStore,
+		manager:          manager,
 	}
 }
 
@@ -39,18 +43,35 @@ func (r *RateLimitService) Evaluate(req *http.Request) (RateLimitResult, error) 
 	}
 
 	policy, err := r.policyStore.Get(id)
+	if err == nil {
+		return r.evaluate(id, policy.Limiter)
+	}
+
+	if !errors.Is(err, store.ErrPolicyNotFound) {
+		return RateLimitResult{}, err
+	}
+
+	if r.groupMemberStore == nil {
+		return RateLimitResult{}, store.ErrPolicyNotFound
+	}
+
+	group, err := r.groupMemberStore.GetGroup(id)
 	if err != nil {
 		return RateLimitResult{}, err
 	}
 
-	lim, err := r.manager.GetOrCreate(policy.Identifier, policy.Limiter)
+	return r.evaluate(id, group.Limiter)
+}
+
+func (r *RateLimitService) evaluate(id model.Identifier, config model.LimiterConfig) (RateLimitResult, error) {
+	lim, err := r.manager.GetOrCreate(id, config)
 	if err != nil {
 		return RateLimitResult{}, err
 	}
 
 	return RateLimitResult{
 		LimiterResult: lim.Allow(),
-		Limit:         getLimit(policy.Limiter),
+		Limit:         getLimit(config),
 	}, nil
 }
 
