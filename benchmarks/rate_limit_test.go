@@ -36,7 +36,7 @@ func newBenchmarkRequest() *http.Request {
 		nil,
 	)
 
-	req.Header.Set("Authorization", "Bearer key-1")
+	req.Header.Set("X-Test-Identifier", "key-1")
 
 	return req
 }
