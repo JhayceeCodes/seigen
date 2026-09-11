@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/JhayceeCodes/seigen/identifier"
 	"github.com/JhayceeCodes/seigen/limiter"
 	"github.com/JhayceeCodes/seigen/model"
 	"github.com/JhayceeCodes/seigen/service"
@@ -42,6 +41,12 @@ func newBenchmarkRequest() *http.Request {
 	return req
 }
 
+type testResolver struct{}
+
+func (testResolver) Resolve(req *http.Request) (model.Identifier, error) {
+	return model.Identifier(req.Header.Get("X-Test-Identifier")), nil
+}
+
 func newBenchmarkService(b *testing.B) *service.RateLimitService {
 	b.Helper()
 
@@ -70,7 +75,7 @@ func newBenchmarkService(b *testing.B) *service.RateLimitService {
 
 	manager := limiter.NewManager()
 
-	resolver := identifier.NewAPIKeyResolver()
+	resolver := testResolver{}
 
 	return service.NewRateLimitService(
 		resolver,

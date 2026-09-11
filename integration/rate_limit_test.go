@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/JhayceeCodes/seigen/database"
-	"github.com/JhayceeCodes/seigen/identifier"
 	"github.com/JhayceeCodes/seigen/limiter"
 	"github.com/JhayceeCodes/seigen/migrations"
 	"github.com/JhayceeCodes/seigen/model"
@@ -47,6 +46,12 @@ func setupTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
+type testResolver struct{}
+
+func (testResolver) Resolve(req *http.Request) (model.Identifier, error) {
+	return model.Identifier(req.Header.Get("X-Test-Identifier")), nil
+}
+
 func newRateLimitService(db *sql.DB) (
 	*service.RateLimitService,
 	store.PolicyRepository,
@@ -58,7 +63,7 @@ func newRateLimitService(db *sql.DB) (
 	groupMemberStore := store.NewPostgresPolicyGroupMemberRepository(db)
 
 	manager := limiter.NewManager()
-	resolver := identifier.NewAPIKeyResolver()
+	resolver := testResolver{}
 
 	rateLimitService := service.NewRateLimitService(
 		resolver,
