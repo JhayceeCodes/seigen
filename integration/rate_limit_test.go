@@ -1,50 +1,19 @@
 package integration
 
 import (
-	"database/sql"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/JhayceeCodes/seigen/database"
 	"github.com/JhayceeCodes/seigen/limiter"
-	"github.com/JhayceeCodes/seigen/migrations"
 	"github.com/JhayceeCodes/seigen/model"
 	"github.com/JhayceeCodes/seigen/service"
 	"github.com/JhayceeCodes/seigen/store"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestDB(t *testing.T) *sql.DB {
-	t.Helper()
 
-	dsn := os.Getenv("SEIGEN_TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("SEIGEN_TEST_DATABASE_URL is not set")
-	}
-
-	db, err := database.NewPostgres(dsn)
-	require.NoError(t, err)
-
-	require.NoError(t, migrations.Migrate(db))
-
-	t.Cleanup(func() {
-		_, err := db.Exec(`
-			TRUNCATE
-				seigen_policy_group_members,
-				seigen_policy_groups,
-				seigen_policies
-			RESTART IDENTITY CASCADE
-		`)
-		require.NoError(t, err)
-
-		require.NoError(t, db.Close())
-	})
-
-	return db
-}
 
 type testResolver struct{}
 
@@ -52,15 +21,16 @@ func (testResolver) Resolve(req *http.Request) (model.Identifier, error) {
 	return model.Identifier(req.Header.Get("X-Test-Identifier")), nil
 }
 
-func newRateLimitService(db *sql.DB) (
+func newRateLimitService() (
 	*service.RateLimitService,
 	store.PolicyRepository,
 	store.PolicyGroupRepository,
 	store.PolicyGroupMemberRepository,
 ) {
-	policyStore := store.NewPostgresPolicyRepository(db)
-	groupStore := store.NewPostgresPolicyGroupRepository(db)
-	groupMemberStore := store.NewPostgresPolicyGroupMemberRepository(db)
+	policyStore := store.NewInMemoryPolicyRepository()
+	groupStore := store.NewInMemoryPolicyGroupRepository()
+	groupMemberStore :=
+		store.NewInMemoryPolicyGroupMemberRepository(groupStore)
 
 	manager := limiter.NewManager()
 	resolver := testResolver{}
@@ -75,14 +45,14 @@ func newRateLimitService(db *sql.DB) (
 	return rateLimitService, policyStore, groupStore, groupMemberStore
 }
 
-func newRequest(apiKey string) *http.Request {
+func newRequest(identifier string) *http.Request {
 	req := httptest.NewRequest(
 		http.MethodGet,
 		"/",
 		nil,
 	)
 
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("X-Test-Identifier", identifier)
 
 	return req
 }
@@ -99,10 +69,8 @@ func tokenBucketConfig(capacity int) model.LimiterConfig {
 }
 
 func TestRateLimitService_GroupPolicyFallback(t *testing.T) {
-	db := setupTestDB(t)
-
 	rateLimitService, _, groupStore, groupMemberStore :=
-		newRateLimitService(db)
+		newRateLimitService()
 
 	err := groupStore.Set(model.PolicyGroup{
 		Name:    "premium",
@@ -122,10 +90,8 @@ func TestRateLimitService_GroupPolicyFallback(t *testing.T) {
 }
 
 func TestRateLimitService_IndividualPolicyTakesPrecedence(t *testing.T) {
-	db := setupTestDB(t)
-
 	rateLimitService, policyStore, groupStore, groupMemberStore :=
-		newRateLimitService(db)
+		newRateLimitService()
 
 	// Group allows 5 requests.
 	err := groupStore.Set(model.PolicyGroup{
@@ -170,10 +136,8 @@ func TestRateLimitService_IndividualPolicyTakesPrecedence(t *testing.T) {
 }
 
 func TestRateLimitService_GroupMembersHaveIndependentRuntimeState(t *testing.T) {
-	db := setupTestDB(t)
-
 	rateLimitService, _, groupStore, groupMemberStore :=
-		newRateLimitService(db)
+		newRateLimitService()
 
 	err := groupStore.Set(model.PolicyGroup{
 		Name:    "premium",
@@ -215,9 +179,7 @@ func TestRateLimitService_GroupMembersHaveIndependentRuntimeState(t *testing.T) 
 }
 
 func TestRateLimitService_UnknownIdentifier(t *testing.T) {
-	db := setupTestDB(t)
-
-	rateLimitService, _, _, _ := newRateLimitService(db)
+	rateLimitService, _, _, _ := newRateLimitService()
 
 	result, err := rateLimitService.Evaluate(
 		newRequest("unknown-key"),
@@ -229,10 +191,8 @@ func TestRateLimitService_UnknownIdentifier(t *testing.T) {
 }
 
 func TestRateLimitService_IndividualPolicyDoesNotRequireGroupMembership(t *testing.T) {
-	db := setupTestDB(t)
-
 	rateLimitService, policyStore, _, _ :=
-		newRateLimitService(db)
+		newRateLimitService()
 
 	err := policyStore.Set(model.Policy{
 		Identifier: "key-1",
@@ -251,10 +211,8 @@ func TestRateLimitService_IndividualPolicyDoesNotRequireGroupMembership(t *testi
 }
 
 func TestRateLimitService_GroupMemberUsesPersistedConfiguration(t *testing.T) {
-	db := setupTestDB(t)
-
 	rateLimitService, _, groupStore, groupMemberStore :=
-		newRateLimitService(db)
+		newRateLimitService()
 
 	err := groupStore.Set(model.PolicyGroup{
 		Name:    "standard",
@@ -265,8 +223,6 @@ func TestRateLimitService_GroupMemberUsesPersistedConfiguration(t *testing.T) {
 	err = groupMemberStore.AddMember("standard", "key-1")
 	require.NoError(t, err)
 
-	// The service must retrieve the configuration from PostgreSQL
-	// and construct the runtime limiter from it.
 	result, err := rateLimitService.Evaluate(newRequest("key-1"))
 
 	require.NoError(t, err)
@@ -276,10 +232,8 @@ func TestRateLimitService_GroupMemberUsesPersistedConfiguration(t *testing.T) {
 }
 
 func TestRateLimitService_IndividualPolicyAndGroupUseSeparateRuntimeState(t *testing.T) {
-	db := setupTestDB(t)
-
 	rateLimitService, policyStore, groupStore, groupMemberStore :=
-		newRateLimitService(db)
+		newRateLimitService()
 
 	err := groupStore.Set(model.PolicyGroup{
 		Name:    "premium",
