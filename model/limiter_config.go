@@ -7,6 +7,7 @@ import (
 
 type Algorithm string
 
+// Supported rate-limiting algorithms.
 const (
 	TokenBucket          Algorithm = "token_bucket"
 	LeakyBucket          Algorithm = "leaky_bucket"
@@ -15,6 +16,7 @@ const (
 	SlidingWindowCounter Algorithm = "sliding_window_counter"
 )
 
+// LimiterConfig defines the algorithm and configuration used by a limiter.
 type LimiterConfig struct {
 	Algorithm Algorithm `json:"algorithm"`
 	Config    Config    `json:"comfiguration"`

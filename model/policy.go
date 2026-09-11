@@ -2,16 +2,20 @@ package model
 
 import "errors"
 
+// Policy associates an identifier with a rate-limiting configuration.
 type Policy struct {
 	Identifier Identifier
 	Limiter    LimiterConfig
 }
 
+// PolicyGroup defines a shared rate-limiting configuration for multiple
+// identifiers. Each member maintains independent runtime limiter state.
 type PolicyGroup struct {
 	Name    string
 	Limiter LimiterConfig
 }
 
+// PolicyGroupMember associates an identifier with a policy group.
 type PolicyGroupMember struct {
 	GroupID    int64
 	Identifier Identifier
@@ -34,15 +38,15 @@ func (g PolicyGroup) Validate() error {
 }
 
 func (m PolicyGroupMember) Validate() error {
-    if m.GroupID <= 0 {
-        return errors.New("group ID must be greater than zero")
-    }
+	if m.GroupID <= 0 {
+		return errors.New("group ID must be greater than zero")
+	}
 
-    if m.Identifier == "" {
-        return errors.New("identifier cannot be empty")
-    }
+	if m.Identifier == "" {
+		return errors.New("identifier cannot be empty")
+	}
 
-    return nil
+	return nil
 }
 
 func (p Policy) Equal(other Policy) bool {

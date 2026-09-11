@@ -17,11 +17,15 @@ type RateLimitService struct {
 	manager          *limiter.Manager
 }
 
+// RateLimitResult contains the result of a rate-limit evaluation.
 type RateLimitResult struct {
 	limiter.LimiterResult
 	Limit int
 }
 
+
+// NewRateLimitService creates a rate-limit service using the provided
+// identifier resolver, policy repositories, and limiter manager.
 func NewRateLimitService(
 	resolver identifier.IdentifierResolver,
 	policyStore store.PolicyRepository,
@@ -36,6 +40,12 @@ func NewRateLimitService(
 	}
 }
 
+// Evaluate resolves the request's identifier and evaluates it against the
+// applicable rate-limiting policy.
+//
+// An individual policy takes precedence over a policy group. If no individual
+// policy exists, the identifier's policy group is used when the identifier is
+// a member of one.
 func (r *RateLimitService) Evaluate(req *http.Request) (RateLimitResult, error) {
 	id, err := r.resolver.Resolve(req)
 	if err != nil {

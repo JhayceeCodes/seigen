@@ -6,6 +6,12 @@ import (
 	"github.com/JhayceeCodes/seigen/model"
 )
 
+
+// New creates a limiter using the algorithm and configuration specified by
+// config.
+//
+// It returns an error if the algorithm is unsupported or the configuration
+// is invalid.
 func New(config model.LimiterConfig) (Limiter, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err

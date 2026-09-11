@@ -12,6 +12,7 @@ import (
 //go:embed *.sql
 var migrationFiles embed.FS
 
+// Migrate applies all pending Seigen database migrations.
 func Migrate(db *sql.DB) error {
 	source, err := iofs.New(migrationFiles, ".")
 	if err != nil {

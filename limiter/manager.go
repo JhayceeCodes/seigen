@@ -16,13 +16,17 @@ type Manager struct {
 	instances map[model.Identifier]Instance
 }
 
+// NewManager creates a Manager for maintaining independent runtime limiter
+// instances for identifiers.
 func NewManager() *Manager {
 	return &Manager{
 		instances: make(map[model.Identifier]Instance),
 	}
 }
 
-// Get fetches an existing limiter instance or creates a new one.
+// GetOrCreate returns the existing limiter for an identifier when its
+// configuration matches the requested configuration. Otherwise, it creates
+// and stores a new limiter using the provided configuration.
 func (m *Manager) GetOrCreate(
 	identifier model.Identifier,
 	config model.LimiterConfig,

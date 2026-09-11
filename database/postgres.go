@@ -6,6 +6,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
+// NewPostgres opens and verifies a PostgreSQL database connection.
 func NewPostgres(dsn string) (*sql.DB, error) {
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
