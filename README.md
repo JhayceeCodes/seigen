@@ -11,7 +11,6 @@ A lightweight, configurable rate-limiting library for Go.
 ```       
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/JhayceeCodes/seigen.svg)](https://pkg.go.dev/github.com/JhayceeCodes/seigen)
-[![Go Report Card](https://goreportcard.com/badge/github.com/JhayceeCodes/seigen)](https://goreportcard.com/report/github.com/JhayceeCodes/seigen)
 [![License](https://img.shields.io/github/license/JhayceeCodes/seigen)](LICENSE)                                                                 
 
 
